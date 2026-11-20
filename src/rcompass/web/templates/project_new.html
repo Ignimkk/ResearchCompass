@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}새 연구 만들기 · 연구 나침반{% endblock %}
+
+{% macro field_error(name) -%}
+  {% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}
+{%- endmacro %}
+{% macro invalid(name) -%}
+  {% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}
+{%- endmacro %}
+
+{% macro criterion_row(i, row) %}
+<fieldset class="criterion" data-row>
+  <legend>성공 기준 <span data-row-number>{% if i is number %}{{ i + 1 }}{% endif %}</span></legend>
+  <div class="grid">
+    <label class="span-2">기준 이름 <span class="req">필수</span>
+      <input name="criteria-{{ i }}-name" value="{{ row.name }}" placeholder="예: 오답 수 (평가 100문항)"
+             {{ invalid('criteria-' ~ i ~ '-name') }}>
+    </label>
+    <label>지표 키 <span class="req">필수</span>
+      <input name="criteria-{{ i }}-metric_key" value="{{ row.metric_key }}" placeholder="wrong_count"
+             autocapitalize="off" spellcheck="false" {{ invalid('criteria-' ~ i ~ '-metric_key') }}>
+    </label>
+    <label>방향
+      <select name="criteria-{{ i }}-direction">
+        {% for d in directions %}<option value="{{ d.value }}" {% if row.direction == d.value %}selected{% endif %}>{{ DIRECTION_LABELS[d] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>목표값 <span class="req">필수</span>
+      <input name="criteria-{{ i }}-target" value="{{ row.target }}" inputmode="decimal" placeholder="12"
+             {{ invalid('criteria-' ~ i ~ '-target') }}>
+    </label>
+    <label>단위
+      <input name="criteria-{{ i }}-unit" value="{{ row.unit }}" placeholder="개">
+    </label>
+  </div>
+  {{ field_error('criteria-' ~ i ~ '-name') }}
+  {{ field_error('criteria-' ~ i ~ '-metric_key') }}
+  {{ field_error('criteria-' ~ i ~ '-target') }}
+  <details class="later" {% if row.baseline_values or row.aggregate != 'mean' or row.min_runs not in ('', '1') or errors.get('criteria-' ~ i ~ '-baseline_values') or errors.get('criteria-' ~ i ~ '-min_runs') %}open{% endif %}>
+    <summary>기준선 값과 판정 방식 (나중에 채워도 됩니다)</summary>
+    <div class="grid">
+      <label class="span-2">현재 기준선 값 (실행별, 쉼표로 구분)
+        <input name="criteria-{{ i }}-baseline_values" value="{{ row.baseline_values }}" placeholder="17, 18, 19"
+               inputmode="decimal" {{ invalid('criteria-' ~ i ~ '-baseline_values') }}>
+      </label>
+      <label>여러 실행 집계
+        <select name="criteria-{{ i }}-aggregate">
+          {% for a in aggregates %}<option value="{{ a.value }}" {% if row.aggregate == a.value %}selected{% endif %}>{{ AGGREGATE_LABELS[a] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>최소 실행 수
+        <input name="criteria-{{ i }}-min_runs" value="{{ row.min_runs }}" inputmode="numeric" {{ invalid('criteria-' ~ i ~ '-min_runs') }}>
+      </label>
+    </div>
+    {{ field_error('criteria-' ~ i ~ '-baseline_values') }}
+    {{ field_error('criteria-' ~ i ~ '-min_runs') }}
+    <p class="hint">값을 비워 두면 이 기준은 '미측정'으로 표시됩니다. 실행 수가 최소 실행 수보다 적으면 '근거 부족'입니다.</p>
+  </details>
+</fieldset>
+{% endmacro %}
+
+{% block content %}
+<h1>새 연구 만들기</h1>
+{% if errors %}
+<div class="error-summary" role="alert">
+  <p><strong>입력을 확인해 주세요.</strong> 표시된 항목을 고친 뒤 다시 저장하세요.</p>
+  {% if errors.get('criteria') %}<p>{{ errors['criteria'] }}</p>{% endif %}
+</div>
+{% endif %}
+<form method="post" action="/projects" class="stack" novalidate>
+  <section class="card stack">
+    <label>제목 <span class="req">필수</span>
+      <input name="title" value="{{ values.title }}" placeholder="예: QA 평가 오답 줄이기" {{ invalid('title') }}>
+    </label>
+    {{ field_error('title') }}
+    <label>핵심 연구 질문 <span class="req">필수</span>
+      <textarea name="question" rows="2" placeholder="예: 동일 평가 100문항에서 오답을 18개 → 12개 이하로 줄일 수 있는가?" {{ invalid('question') }}>{{ values.question }}</textarea>
+    </label>
+    {{ field_error('question') }}
+    <label>현재 기준선 이름 <span class="req">필수</span>
+      <input name="baseline_label" value="{{ values.baseline_label }}" placeholder="예: 현행 프롬프트 v1" {{ invalid('baseline_label') }}>
+    </label>
+    {{ field_error('baseline_label') }}
+  </section>
+
+  <section class="stack" id="criteria">
+    <h2>성공 기준</h2>
+    <p class="hint">연구 목표를 판정할 수치입니다. 지표 키는 실험 결과를 기록할 때 쓰는 이름입니다(영문).</p>
+    {% for row in rows %}{{ criterion_row(loop.index0, row) }}{% endfor %}
+    <template id="criterion-template">{{ criterion_row('__i__'|safe, {'name': '', 'metric_key': '', 'direction': 'lower', 'target': '', 'unit': '', 'aggregate': 'mean', 'min_runs': '1', 'baseline_values': ''}) }}</template>
+    <button type="button" class="button" id="add-criterion" data-max="{{ max_rows }}" hidden>성공 기준 추가</button>
+  </section>
+
+  <section class="card stack">
+    <label>다음 행동 (선택)
+      <input name="next_action" value="{{ values.next_action }}" placeholder="예: 오답 18개를 유형별로 분류한다">
+    </label>
+  </section>
+
+  <div class="actions">
+    <button type="submit" class="button primary">연구 만들기</button>
+    <a class="button" href="/">취소</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='project_new.js') }}" defer></script>
+{% endblock %}

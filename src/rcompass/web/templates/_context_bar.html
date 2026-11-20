@@ -1,0 +1,9 @@
+{# 모든 프로젝트 화면 상단 고정: 원래 질문, 현재 위치, 돌아갈 곳 (계획서 3절) #}
+<nav class="context-bar" aria-label="연구 맥락">
+  <p class="question"><span class="tag">원래 질문</span> {{ project.question }}</p>
+  <p class="trail">
+    <a href="/projects/{{ project.id }}">{{ project.title }}</a>
+    {% for crumb in crumbs or [] %} › {% if crumb.url %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}<span aria-current="page">{{ crumb.label }}</span>{% endif %}{% endfor %}
+    {% if baseline %}<span class="return">↩ 현재 기준선 {{ baseline.short_id }} {{ baseline.label }}</span>{% endif %}
+  </p>
+</nav>

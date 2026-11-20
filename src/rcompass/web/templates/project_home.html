@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }} · 연구 나침반{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% block content %}
+<h1>{{ project.title }}</h1>
+
+<section class="card">
+  <h2>원래 질문</h2>
+  <p class="lead">{{ project.question }}</p>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>성공 기준별 최신 근거</h2>
+    <p class="goal-summary">
+      목표 달성: 성공 기준 {{ evaluations|length }}개 중
+      {% for state in states %}<span class="badge state-{{ state.value }}">{{ state_labels[state] }} {{ summary[state] }}</span>{% endfor %}
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">기준</th><th scope="col">목표</th><th scope="col">현재 기준선{% if baseline %} {{ baseline.short_id }}{% endif %}</th><th scope="col">상태</th></tr>
+      </thead>
+      <tbody>
+        {% for e in evaluations %}
+        <tr>
+          <td><span class="id">{{ e.criterion.short_id }}</span> {{ e.criterion.name }}<br><code class="muted">{{ e.criterion.metric_key }}</code></td>
+          <td>{{ e.criterion.direction|direction_symbol }} {{ e.criterion.target|target }}{% if e.criterion.unit %} {{ e.criterion.unit }}{% endif %}
+            <br><span class="muted">{{ AGGREGATE_LABELS[e.criterion.aggregate] }}{% if e.criterion.min_runs > 1 %}, 실행 {{ e.criterion.min_runs }}개 이상{% endif %}</span></td>
+          <td>{{ e.display_value }}</td>
+          <td><span class="badge state-{{ e.state.value }}">{{ e.state_label }}</span>
+            {% if e.state.value == 'insufficient' %}<br><span class="muted">실행 {{ e.aggregated.n }}/{{ e.criterion.min_runs }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">목표 달성은 현재 기준선의 측정값으로만 판정합니다. 완료한 실험 수와는 별개입니다.</p>
+</section>
+
+<div class="two-col">
+  <section class="card">
+    <h2>현재 기준선</h2>
+    {% if baseline %}
+    <p><span class="id">{{ baseline.short_id }}</span> {{ baseline.label }}</p>
+    <p class="muted">측정 실험 {{ baseline_experiment.short_id }} · {{ baseline_experiment.title }}</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>다음 행동</h2>
+    <p>{{ project.next_action or '아직 정하지 않았습니다.' }}</p>
+  </section>
+</div>
+{% endblock %}

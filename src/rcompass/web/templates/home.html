@@ -1,9 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="empty-state">
+{% if projects %}
+<div class="page-head">
+  <h1>연구 목록</h1>
+  <a class="button primary" href="/projects/new">새 연구 만들기</a>
+</div>
+<ul class="project-list">
+  {% for project in projects %}
+  <li class="card">
+    <a class="project-link" href="/projects/{{ project.id }}">{{ project.title }}</a>
+    <p class="muted">{{ project.question }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="card empty-state">
   <h1>아직 프로젝트가 없습니다</h1>
-  <p>연구 질문, 성공 기준, 현재 기준선을 적어 첫 연구를 시작하세요.
-     (프로젝트 생성 화면은 다음 단계에서 추가됩니다.)</p>
+  <p>연구 질문, 성공 기준, 현재 기준선을 적어 첫 연구를 시작하세요.</p>
+  <p><a class="button primary" href="/projects/new">새 연구 만들기</a></p>
+</section>
+{% endif %}
+<section class="data-dir">
   <dl class="meta">
     <dt>데이터 저장 위치</dt>
     <dd><code>{{ data_dir }}</code></dd>

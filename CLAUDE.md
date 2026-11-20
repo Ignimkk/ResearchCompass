@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 1단계(데이터 모델과 마이그레이션)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 2단계(프로젝트, 성공 기준, 기준선 0 만들기 화면)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -23,7 +23,12 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
 ## 구조와 불변 규칙
 
 - **데이터는 저장소 밖에 둡니다.** [config.py](src/rcompass/config.py)의 `resolve_data_dir`가 데이터 경로를 정하고, 우선순위는 `--data-dir`, `RCOMPASS_DATA_DIR`, platformdirs 기본값(`%LOCALAPPDATA%\rcompass`) 순서입니다. 데이터 경로가 소스 체크아웃 안에 있으면 CLI와 홈 화면 모두 경고합니다. 테스트에서는 `env=` 인자나 `tmp_path`를 써서 실제 환경변수와 사용자 경로에 의존하지 않습니다.
-- **앱 팩토리** [web/app.py](src/rcompass/web/app.py)의 `create_app(settings)`는 엔진 생성과 DB 파일 생성을 lifespan 시작 시점에만 합니다. 그래서 `TestClient`를 `with` 블록 없이 쓰면 파일이 생기지 않습니다. 저장소 안 경로를 테스트할 때 이 성질을 이용합니다.
+- **앱 팩토리** [web/app.py](src/rcompass/web/app.py)의 `create_app(settings)`는 엔진과 DB 파일을 lifespan 시작 시점에만 만듭니다(`app.state.sessions`도 이때 생김). 그래서 페이지 테스트는 항상 `with TestClient(app, base_url="http://127.0.0.1:8765")`로 씁니다. Host 검사 때문에 `base_url`이 필요합니다.
+- **웹 계층 규칙**:
+  - 라우트는 [web/routes/](src/rcompass/web/routes/)에 두고, 도메인 로직은 [services/](src/rcompass/services/)에 둡니다. 서비스는 `ValidationError(errors={필드: 한국어 메시지})`를 던지고, 커밋은 호출한 쪽이 합니다.
+  - `async def` 라우트에서는 DB를 직접 쓰지 말고 `run_in_threadpool`로 넘깁니다. 모든 트랜잭션이 `BEGIN IMMEDIATE`라서, 이벤트 루프에서 잠금을 기다리면 서버 전체가 멈춥니다. 동기 `def` 라우트는 `get_session` 의존성을 씁니다.
+  - [security.py](src/rcompass/web/security.py)의 `LocalOnlyMiddleware`가 Host(127.0.0.1/localhost만)와 상태 변경 요청의 Origin/Referer를 검사합니다. CSRF와 DNS 리바인딩을 막기 위한 것입니다.
+  - 오류 페이지는 `error.html`로 한국어로 보여줍니다.
 - **CLI 진입점**은 `rcompass.cli:run`입니다. Click이 도움말을 출력하기 전에 `ensure_utf8_output`으로 stdout과 stderr를 UTF-8로 바꿉니다. 이것이 없으면 Windows에서 출력을 리디렉션할 때 한국어 출력에서 `UnicodeEncodeError`가 납니다. `--data-dir`는 빈 문자열이 `Path(".")`로 바뀌지 않도록 `str`로 받습니다.
 - 서버는 `127.0.0.1`에만 바인딩합니다. 인증이 없는 단일 사용자 앱이기 때문입니다.
 - **DB와 트랜잭션** ([db.py](src/rcompass/db.py)):
