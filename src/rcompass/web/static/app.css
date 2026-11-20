@@ -180,7 +180,42 @@ details.later .grid { margin-top: 0.5rem; }
 .context-bar p { max-width: 960px; margin: 0 auto; }
 .context-bar .question { font-weight: 600; }
 .context-bar .trail { font-size: 0.9rem; color: var(--muted); }
-.context-bar .return { margin-left: 0.75rem; }
+.context-bar .return { font-size: 0.9rem; color: var(--muted); }
+.project-tabs { max-width: 960px; margin: 0.25rem auto 0; display: flex; gap: 1rem; font-size: 0.9rem; }
+.project-tabs a { text-decoration: none; color: var(--muted); padding-bottom: 0.15rem; }
+.project-tabs a[aria-current="page"] { color: var(--text); font-weight: 600; border-bottom: 2px solid var(--accent); }
+
+/* 문제 트리 */
+.tree-root { margin: 0 0 0.75rem; font-weight: 600; }
+.tree { list-style: none; margin: 0; padding-left: 1.25rem; border-left: 2px solid var(--border); }
+.tree.root { padding-left: 0.75rem; }
+.tree-node { margin: 0.6rem 0; }
+.node-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
+.node-line a { font-weight: 600; }
+.why { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.tree-node.status-resolved > .node-line a, .tree-node.status-dropped > .node-line a { color: var(--muted); }
+.tree-node.status-dropped > .node-line a { text-decoration: line-through; }
+.tree-node.is-focus > .node-line { background: var(--warn-bg); border-radius: 4px; padding: 0 0.25rem; }
+.outcomes { font-size: 0.85rem; color: var(--muted); display: inline-flex; gap: 0.4rem; }
+.chip {
+  display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0 0.45rem;
+  border-radius: 999px; white-space: nowrap; background: var(--unmeasured-bg); color: var(--muted);
+}
+.chip-active { background: var(--met-bg); color: var(--met); }
+.chip-parked { background: var(--insufficient-bg); color: var(--insufficient); }
+.chip-focus { background: var(--warn-bg); color: var(--warn); }
+details.add-child { margin-top: 0.3rem; }
+details.add-child summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+.problem-form { display: grid; gap: 0.5rem; margin-top: 0.5rem; max-width: 640px; }
+.problem-form.compact { padding: 0.75rem; border: 1px dashed var(--border); border-radius: 6px; }
+.problem-form .button { justify-self: start; }
+label.checkbox { display: flex; align-items: center; gap: 0.5rem; font-weight: 400; }
+label.checkbox input { width: auto; margin: 0; }
+.drawer-list { list-style: none; padding: 0; margin: 0; }
+.drawer-list li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.drawer-list li:last-child { border-bottom: 0; }
+.drawer-list p { margin: 0.15rem 0 0.35rem; }
+.path { margin: 0 0 0.25rem; }
 .tag {
   display: inline-block;
   font-size: 0.75rem;
@@ -217,6 +252,6 @@ td .badge { margin-left: 0; }
 .project-link { font-weight: 700; font-size: 1.05rem; }
 .project-list p { margin: 0.25rem 0 0; }
 
-.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .two-col .card { margin-bottom: 0; }
 @media (max-width: 640px) { .two-col { grid-template-columns: minmax(0, 1fr); } }

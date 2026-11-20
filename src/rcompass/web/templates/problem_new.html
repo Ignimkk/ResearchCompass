@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_problem_form.html" import problem_form %}
+{% block title %}새 하위 문제 · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% block content %}
+<h1>새 하위 문제</h1>
+<p class="muted">상위: {% if parent %}<span class="id">{{ parent.short_id }}</span> {{ parent.title }}{% else %}연구 질문{% endif %}</p>
+{% if errors %}
+<div class="error-summary" role="alert">
+  <p><strong>입력을 확인해 주세요.</strong></p>
+  {% if errors.get('parent') %}<p>{{ errors['parent'] }}</p>{% endif %}
+</div>
+{% endif %}
+<section class="card">
+  {{ problem_form(project, parent=parent, values=values, errors=errors) }}
+</section>
+{% endblock %}

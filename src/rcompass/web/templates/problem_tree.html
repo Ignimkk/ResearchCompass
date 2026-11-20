@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_problem_form.html" import problem_form %}
+{% block title %}문제 트리 · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+
+{% macro outcome_badges(node) -%}
+  {% if node.experiment_count %}
+  <span class="outcomes" aria-label="실험 결과">
+    {% for outcome, symbol in outcome_symbols.items() %}{% if node.outcomes[outcome] %}<span title="{{ symbol[1] }}">{{ symbol[0] }}{{ node.outcomes[outcome] }}</span>{% endif %}{% endfor %}
+    {% if node.outcomes[None] %}<span title="진행 중">…{{ node.outcomes[None] }}</span>{% endif %}
+  </span>
+  {%- endif %}
+{%- endmacro %}
+
+{% macro tree_node(node) %}
+<li id="{{ node.problem.short_id }}" class="tree-node status-{{ node.problem.status.value }}{% if node.problem.id == project.focus_problem_id %} is-focus{% endif %}">
+  <div class="node-line">
+    <a href="/projects/{{ project.id }}/problems/{{ node.problem.short_id }}"><span class="id">{{ node.problem.short_id }}</span> {{ node.problem.title }}</a>
+    <span class="chip chip-{{ node.problem.status.value }}">{{ status_labels[node.problem.status] }}</span>
+    {% if node.problem.id == project.focus_problem_id %}<span class="chip chip-focus">집중</span>{% endif %}
+    {{ outcome_badges(node) }}
+  </div>
+  <p class="why">이유: {{ node.problem.why }}</p>
+  <details class="add-child">
+    <summary>+ 하위 문제</summary>
+    {{ problem_form(project, parent=node.problem, compact=True) }}
+  </details>
+  {% if node.children %}
+  <ul class="tree">{% for child in node.children %}{{ tree_node(child) }}{% endfor %}</ul>
+  {% endif %}
+</li>
+{% endmacro %}
+
+{% block content %}
+<h1>문제 트리</h1>
+<section class="card">
+  <p class="tree-root"><span class="tag">연구 질문</span> {{ project.question }}</p>
+  {% if tree %}
+  <ul class="tree root">{% for node in tree %}{{ tree_node(node) }}{% endfor %}</ul>
+  {% else %}
+  <p class="muted">아직 하위 문제가 없습니다. 연구 중 생긴 문제를 아래에서 연구 질문에 연결하세요.</p>
+  {% endif %}
+  <details class="add-child" {% if not tree %}open{% endif %}>
+    <summary>+ 연구 질문 바로 아래에 문제 추가</summary>
+    {{ problem_form(project, compact=True) }}
+  </details>
+</section>
+
+<section class="card drawer">
+  <h2>보류 서랍 · 나중에 검토할 아이디어 {{ parked|length }}개</h2>
+  {% if parked %}
+  <ul class="drawer-list">
+    {% for problem in parked %}
+    <li>
+      <a href="/projects/{{ project.id }}/problems/{{ problem.short_id }}"><span class="id">{{ problem.short_id }}</span> {{ problem.title }}</a>
+      <p class="muted">재개 조건: {{ problem.revisit_condition or '정하지 않음' }}</p>
+      <form method="post" action="/projects/{{ project.id }}/problems/{{ problem.short_id }}/status">
+        <input type="hidden" name="status" value="active">
+        <button type="submit" class="button">지금 조사로 전환</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">보류한 아이디어가 없습니다.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -14,7 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from rcompass import __version__
 from rcompass.config import Settings
 from rcompass.db import open_database, session_factory
-from rcompass.web.routes import projects
+from rcompass.web.routes import problems, projects
 from rcompass.web.security import LOCAL_HOSTS, LocalOnlyMiddleware
 from rcompass.web.templating import WEB_DIR, templates
 
@@ -58,6 +58,7 @@ def create_app(settings: Settings, *, allowed_hosts: Sequence[str] = LOCAL_HOSTS
 
     app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
     app.include_router(projects.router)
+    app.include_router(problems.router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

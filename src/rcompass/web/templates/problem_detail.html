@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "_problem_form.html" import problem_form %}
+{% block title %}{{ problem.short_id }} {{ problem.title }} · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><span class="id">{{ problem.short_id }}</span> {{ problem.title }}</h1>
+  <span class="chip chip-{{ problem.status.value }}">{{ status_labels[problem.status] }}</span>
+</div>
+
+<section class="card">
+  <h2>이 문제를 푸는 이유</h2>
+  <p class="lead">{{ problem.why }}</p>
+  {% if problem.status.value == 'parked' %}
+  <p class="muted">재개 조건: {{ problem.revisit_condition or '정하지 않음' }}</p>
+  {% endif %}
+</section>
+
+<div class="two-col">
+  <section class="card">
+    <h2>상태</h2>
+    <form method="post" action="/projects/{{ project.id }}/problems/{{ problem.short_id }}/status" class="stack">
+      <label>상태 바꾸기
+        <select name="status">
+          {% for s in statuses %}<option value="{{ s.value }}" {% if s == problem.status %}selected{% endif %}>{{ status_labels[s] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>재개 조건 (나중에 검토로 바꿀 때, 선택)
+        <input name="revisit_condition" value="{{ problem.revisit_condition or '' }}">
+      </label>
+      <button type="submit" class="button">저장</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>집중</h2>
+    {% if is_focus %}
+    <p>지금 집중하는 문제입니다. 프로젝트 홈에 표시됩니다.</p>
+    <form method="post" action="/projects/{{ project.id }}/focus">
+      <input type="hidden" name="problem" value="">
+      <button type="submit" class="button">집중 해제</button>
+    </form>
+    {% elif problem.status.value == 'active' %}
+    <p class="muted">며칠 뒤 프로젝트를 열었을 때 이어서 볼 문제로 지정합니다.</p>
+    <form method="post" action="/projects/{{ project.id }}/focus">
+      <input type="hidden" name="problem" value="{{ problem.short_id }}">
+      <button type="submit" class="button primary">집중 문제로 지정</button>
+    </form>
+    {% else %}
+    <p class="muted">'지금 조사' 상태인 문제만 집중 문제로 지정할 수 있습니다.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>하위 문제 {{ children|length }}개</h2>
+  {% if children %}
+  <ul class="drawer-list">
+    {% for child in children %}
+    <li><a href="/projects/{{ project.id }}/problems/{{ child.short_id }}"><span class="id">{{ child.short_id }}</span> {{ child.title }}</a>
+      <span class="chip chip-{{ child.status.value }}">{{ status_labels[child.status] }}</span>
+      <p class="muted">이유: {{ child.why }}</p></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <details class="add-child" {% if not children %}open{% endif %}>
+    <summary>+ 하위 문제 추가</summary>
+    {{ problem_form(project, parent=problem, compact=True) }}
+  </details>
+</section>
+
+<section class="card">
+  <h2>실험</h2>
+  <p class="muted">이 문제의 실험은 다음 단계(실험 기록)에서 추가됩니다.</p>
+</section>
+{% endblock %}

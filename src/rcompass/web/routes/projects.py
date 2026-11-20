@@ -12,8 +12,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from rcompass.config import is_inside, source_checkout_root
-from rcompass.models import Aggregate, Baseline, Direction, Experiment
+from rcompass.models import Aggregate, Direction, Experiment, Problem
 from rcompass.services import ValidationError
+from rcompass.services.problems import STATUS_LABELS as PROBLEM_STATUS_LABELS
+from rcompass.services.problems import inactive_ancestors, parked_problems, problem_path
 from rcompass.services.progress import STATE_LABELS, CriterionState, evaluate_project, goal_summary
 from rcompass.services.projects import (
     CriterionInput,
@@ -23,6 +25,7 @@ from rcompass.services.projects import (
     list_projects,
     validate_project_input,
 )
+from rcompass.web.context import project_context
 from rcompass.web.deps import get_session
 from rcompass.web.templating import templates
 
@@ -201,18 +204,25 @@ def project_home(request: Request, project_id: int, session: SessionDep) -> HTML
     if project is None:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
     evaluations = evaluate_project(session, project)
-    baseline = session.get(Baseline, project.current_baseline_id) if project.current_baseline_id else None
+    context = project_context(session, project, section="home")
+    baseline = context["baseline"]
     baseline_experiment = session.get(Experiment, baseline.source_experiment_id) if baseline else None
+    focus = session.get(Problem, project.focus_problem_id) if project.focus_problem_id else None
+    focus_path = problem_path(session, focus) if focus else []
     return templates.TemplateResponse(
         request,
         "project_home.html",
         {
-            "project": project,
+            **context,
             "evaluations": evaluations,
             "summary": goal_summary(evaluations),
             "states": list(CriterionState),
             "state_labels": STATE_LABELS,
-            "baseline": baseline,
             "baseline_experiment": baseline_experiment,
+            "focus": focus,
+            "focus_path": focus_path,
+            "focus_blockers": inactive_ancestors(focus_path),
+            "problem_status_labels": PROBLEM_STATUS_LABELS,
+            "parked_count": len(parked_problems(session, project.id)),
         },
     )

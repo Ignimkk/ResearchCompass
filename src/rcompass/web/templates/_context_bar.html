@@ -3,7 +3,17 @@
   <p class="question"><span class="tag">원래 질문</span> {{ project.question }}</p>
   <p class="trail">
     <a href="/projects/{{ project.id }}">{{ project.title }}</a>
-    {% for crumb in crumbs or [] %} › {% if crumb.url %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}<span aria-current="page">{{ crumb.label }}</span>{% endif %}{% endfor %}
-    {% if baseline %}<span class="return">↩ 현재 기준선 {{ baseline.short_id }} {{ baseline.label }}</span>{% endif %}
+    {%- for crumb in crumbs %} › {% if crumb.url %}<a href="{{ crumb.url }}">{{ crumb.label }}</a>{% else %}<span aria-current="page">{{ crumb.label }}</span>{% endif %}{% endfor %}
   </p>
+  {% if return_to or baseline %}
+  <p class="return">
+    {% if return_to %}↩ 돌아갈 곳: <a href="{{ return_to.url }}">{{ return_to.label }}</a>{% endif %}
+    {% if return_to and baseline %} · {% endif %}
+    {% if baseline %}현재 기준선 <span class="id">{{ baseline.short_id }}</span> {{ baseline.label }}{% endif %}
+  </p>
+  {% endif %}
+  <div class="project-tabs">
+    <a href="/projects/{{ project.id }}" {% if section == 'home' %}aria-current="page"{% endif %}>홈</a>
+    <a href="/projects/{{ project.id }}/problems" {% if section == 'problems' %}aria-current="page"{% endif %}>문제 트리</a>
+  </div>
 </nav>

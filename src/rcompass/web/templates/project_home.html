@@ -10,6 +10,20 @@
 </section>
 
 <section class="card">
+  <h2>지금 집중할 문제</h2>
+  {% if focus %}
+  <p class="path">원래 질문{% for p in focus_path %} › <a href="/projects/{{ project.id }}/problems/{{ p.short_id }}"><span class="id">{{ p.short_id }}</span> {{ p.title }}</a>{% endfor %}</p>
+  <p class="muted">이유: {{ focus.why }}</p>
+  {% for p in focus_blockers %}
+  <p class="warning" role="status">상위 문제 <span class="id">{{ p.short_id }}</span> {{ p.title }}이(가) '{{ problem_status_labels[p.status] }}' 상태입니다. 이 집중 문제를 계속 조사할지 확인하세요.</p>
+  {% endfor %}
+  {% else %}
+  <p class="muted">아직 지정하지 않았습니다. <a href="/projects/{{ project.id }}/problems">문제 트리</a>에서 '지금 조사' 중인 문제를 집중 문제로 지정하세요.</p>
+  {% endif %}
+  {% if parked_count %}<p class="muted">보류 서랍에 나중에 검토할 아이디어 {{ parked_count }}개가 있습니다.</p>{% endif %}
+</section>
+
+<section class="card">
   <div class="section-head">
     <h2>성공 기준별 최신 근거</h2>
     <p class="goal-summary">

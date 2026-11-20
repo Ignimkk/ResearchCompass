@@ -1,0 +1,24 @@
+{# 하위 문제 추가 폼: 제목과 이유 한 줄만 받습니다. parent가 없으면 연구 질문 바로 아래. #}
+{% macro problem_form(project, parent=None, values={}, errors={}, compact=False) %}
+<form method="post" action="/projects/{{ project.id }}/problems" class="problem-form {% if compact %}compact{% endif %}">
+  {% if parent %}<input type="hidden" name="parent" value="{{ parent.short_id }}">{% endif %}
+  <label>문제 <span class="req">필수</span>
+    <input name="title" value="{{ values.get('title', '') }}" placeholder="예: 장문 지문에서 오답이 많다"
+           {% if errors.get('title') %}aria-invalid="true" aria-describedby="title-error"{% endif %}>
+  </label>
+  {% if errors.get('title') %}<p class="field-error" id="title-error">{{ errors['title'] }}</p>{% endif %}
+  <label>이 문제를 푸는 이유 (한 줄) <span class="req">필수</span>
+    <input name="why" value="{{ values.get('why', '') }}" placeholder="예: 오답 18개 중 7개가 장문 문항"
+           {% if errors.get('why') %}aria-invalid="true" aria-describedby="why-error"{% endif %}>
+  </label>
+  {% if errors.get('why') %}<p class="field-error" id="why-error">{{ errors['why'] }}</p>{% endif %}
+  <label class="checkbox"><input type="checkbox" name="parked" value="1" {% if values.get('parked') %}checked{% endif %}>
+    지금 조사하지 않고 나중에 검토할 아이디어로 추가</label>
+  {% if not compact %}
+  <label>재개 조건 (나중에 검토일 때, 선택)
+    <input name="revisit_condition" value="{{ values.get('revisit_condition', '') }}" placeholder="예: 프롬프트 개선이 한계에 도달하면">
+  </label>
+  {% endif %}
+  <button type="submit" class="button primary">추가</button>
+</form>
+{% endmacro %}
