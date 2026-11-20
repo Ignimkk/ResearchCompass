@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# 개인 연구 데이터와 비밀값은 저장소에 넣지 않습니다.
+.env
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+
+# Archify 검증 영수증: 로컬 절대 경로가 들어 있어 공개 저장소에 올리지 않습니다.
+docs/architecture/*.finalize.json
+docs/architecture/*.finalize-summary.json
+docs/architecture/*.browser-check.json
+docs/architecture/*.delivery.json
+.archify/
+
+# Archify 스킬 패키지(약 18MB)는 저장소에 넣지 않습니다. 설치 방법: docs/architecture/README.md
+# 출처와 해시는 skills-lock.json에 기록됩니다.
+.claude/skills/archify/

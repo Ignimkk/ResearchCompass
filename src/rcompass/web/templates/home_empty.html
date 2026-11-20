@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="empty-state">
+  <h1>아직 프로젝트가 없습니다</h1>
+  <p>연구 질문, 성공 기준, 현재 기준선을 적어 첫 연구를 시작하세요.
+     (프로젝트 생성 화면은 다음 단계에서 추가됩니다.)</p>
+  <dl class="meta">
+    <dt>데이터 저장 위치</dt>
+    <dd><code>{{ data_dir }}</code></dd>
+  </dl>
+  {% if data_dir_inside_checkout %}
+  <p class="warning" role="alert">주의: 이 폴더는 소스 저장소 안에 있습니다. 개인 연구 데이터가 Git에 올라가지 않도록
+     <code>--data-dir</code>로 저장소 밖 경로를 지정하세요.</p>
+  {% else %}
+  <p class="hint">이 폴더에 DB와 첨부 파일이 저장됩니다. 소스 저장소 밖에 있으므로 Git에 올라가지 않습니다.</p>
+  {% endif %}
+</section>
+{% endblock %}

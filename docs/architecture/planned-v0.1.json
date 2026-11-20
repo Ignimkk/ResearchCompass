@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "연구 나침반 v0.1 구조 (계획 단계 예상)",
+    "locale": "ko",
+    "output": "docs/architecture/planned-v0.1.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "researcher", "type": "external", "label": "연구자", "sublabel": "브라우저·터미널", "icon": "person", "pos": [40, 220], "size": [160, 64] },
+    { "id": "archify", "type": "external", "label": "Archify 스킬", "sublabel": "구조도 HTML 생성", "pos": [330, 40], "size": [170, 64] },
+    { "id": "web", "type": "frontend", "label": "웹 화면", "sublabel": "FastAPI + Jinja2·htmx", "pos": [330, 220], "size": [170, 64] },
+    { "id": "extdata", "type": "external", "label": "외부 데이터", "sublabel": "로컬·NAS 경로, URL", "pos": [640, 40], "size": [170, 64] },
+    { "id": "services", "type": "backend", "label": "서비스 계층", "sublabel": "결정·기준선·실행 집계", "tag": "인계·계보·백업", "pos": [640, 220], "size": [170, 244] },
+    { "id": "db", "type": "database", "label": "SQLite", "sublabel": "rcompass.db (WAL)", "pos": [950, 220], "size": [170, 64] },
+    { "id": "files", "type": "database", "label": "첨부 파일 저장소", "sublabel": "files/sha256/…", "pos": [950, 400], "size": [170, 64] },
+    { "id": "claude", "type": "external", "label": "Claude Code 세션", "sublabel": "연구 저장소에서 실행", "pos": [40, 580], "size": [160, 64] },
+    { "id": "cli", "type": "frontend", "label": "rcompass CLI", "sublabel": "serve·handoff·backup", "pos": [640, 580], "size": [170, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "rcompass 앱 · 127.0.0.1 전용", "wraps": ["web", "services", "cli"] },
+    { "kind": "region", "label": "데이터 디렉터리 (저장소 밖)", "wraps": ["db", "files"] }
+  ],
+  "connections": [
+    { "id": "researcher-web", "from": "researcher", "to": "web", "label": "HTTP 127.0.0.1", "variant": "emphasis" },
+    { "id": "web-services", "from": "web", "to": "services", "label": "서비스 호출", "variant": "emphasis" },
+    { "id": "services-db", "from": "services", "to": "db", "label": "SQL", "variant": "emphasis" },
+    { "id": "services-files", "from": "services", "to": "files", "label": "sha256 주소 저장" },
+    { "id": "services-extdata", "from": "services", "to": "extdata", "label": "위치·sha256만 기록", "variant": "dashed" },
+    { "id": "archify-web", "from": "archify", "to": "web", "label": "구조도 HTML 등록", "variant": "dashed" },
+    { "id": "cli-services", "from": "cli", "to": "services", "label": "같은 서비스 호출" },
+    { "id": "handoff-paste", "from": "researcher", "to": "claude", "label": "인계 Markdown", "variant": "dashed" },
+    { "id": "claude-cli", "from": "claude", "to": "cli", "label": "rcompass handoff" }
+  ],
+  "cards": [
+    { "dot": "amber", "title": "계획 단계 예상 구조", "items": [
+      "대부분 아직 구현 전입니다. 현재 구현된 것은 0단계 골격(웹 빈 화면, CLI serve, SQLite 연결)뿐입니다.",
+      "코드 근거(SRC)가 없는 그림입니다. 구현 단계가 끝날 때마다 푸시된 커밋에 고정한 코드 근거 구조도로 바꿉니다.",
+      "기준: 구현 계획서 6절 구현 순서 (2026-11-20)"
+    ] },
+    { "dot": "emerald", "title": "데이터는 저장소 밖에", "items": [
+      "기본 위치는 %LOCALAPPDATA%\\rcompass 이고 --data-dir로 바꿀 수 있습니다.",
+      "백업 zip에는 DB 스냅샷, 첨부 파일, manifest가 들어갑니다.",
+      "대용량 외부 데이터는 위치와 sha256만 기록하고 백업에서 뺍니다."
+    ] },
+    { "dot": "violet", "title": "Claude Code 인계", "items": [
+      "연구자가 인계 Markdown을 새 Claude Code 세션에 붙여넣습니다.",
+      "Claude Code는 실험 결과를 rcompass-result 블록으로 보고합니다.",
+      "연구자가 웹 화면에서 블록을 붙여넣고 확인해야 기록됩니다."
+    ] },
+    { "dot": "rose", "title": "바뀌지 않는 규칙", "items": [
+      "결정과 기준선 변경은 추가만 할 수 있고 고치거나 지우지 않습니다.",
+      "앱은 연구 저장소의 Git과 원본 파일을 바꾸지 않습니다."
+    ] }
+  ]
+}
