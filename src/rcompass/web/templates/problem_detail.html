@@ -69,7 +69,21 @@
 </section>
 
 <section class="card">
-  <h2>실험</h2>
-  <p class="muted">이 문제의 실험은 다음 단계(실험 기록)에서 추가됩니다.</p>
+  <div class="section-head">
+    <h2>실험 {{ experiments|length }}개</h2>
+    <a class="button primary" href="/projects/{{ project.id }}/problems/{{ problem.short_id }}/experiments/new">새 실험</a>
+  </div>
+  {% if experiments %}
+  <ul class="drawer-list">
+    {% for e in experiments %}
+    <li><a href="/projects/{{ project.id }}/experiments/{{ e.short_id }}"><span class="id">{{ e.short_id }}</span> {{ e.title }}</a>
+      {% if e.outcome %}<span class="chip">{{ outcome_symbols[e.outcome][0] }} {{ outcome_symbols[e.outcome][1] }}</span>
+      {% else %}<span class="chip">{{ '결과 있음' if e.status.value == 'done' else '계획' }}</span>{% endif %}
+      <p class="muted">가설: {{ e.hypothesis }}</p></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">아직 실험이 없습니다. 가설과 판정 기준을 먼저 적고 실험을 시작하세요.</p>
+  {% endif %}
 </section>
 {% endblock %}

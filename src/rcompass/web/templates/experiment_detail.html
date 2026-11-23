@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ experiment.short_id }} {{ experiment.title }} · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% macro err(name) %}{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <h1><span class="id">{{ experiment.short_id }}</span> {{ experiment.title }}</h1>
+  <span class="chip {% if experiment.status.value == 'done' %}chip-active{% endif %}">{{ '결과 있음' if experiment.status.value == 'done' else '계획' }}</span>
+</div>
+
+{% if notice.saved == 'results' %}<p class="notice" role="status">결과를 기록했습니다.{% if notice.snapshot %} 새 실행을 기준선 {{ notice.snapshot }}의 근거에 더했습니다.{% endif %}</p>{% endif %}
+{% if notice.saved in ('plan', 'inputs', 'exclude') %}<p class="notice" role="status">저장했습니다.</p>{% endif %}
+{% if notice.warn %}<p class="warning" role="status">{{ notice.warn }}</p>{% endif %}
+
+{# 1. 가설과 판정 기준 #}
+{% if is_baseline_measurement %}
+<section class="card">
+  <h2>기준선 측정</h2>
+  <p>현재 방식의 성능을 재는 실험입니다. 여기에 기록한 실행이 기준선 B0의 근거가 됩니다(B0이 현재 기준선일 때).</p>
+</section>
+{% else %}
+<div class="two-col">
+  <section class="card"><h2>가설</h2><p class="lead">{{ experiment.hypothesis }}</p></section>
+  <section class="card"><h2>판정 기준</h2><p class="lead">{{ experiment.decision_rule }}</p></section>
+</div>
+<details class="card later" {% if values.get('plan_open') %}open{% endif %}>
+  <summary>제목·가설·판정 기준 고치기{% if revisions %} (변경 이력 {{ revisions|length }}건){% endif %}</summary>
+  <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/plan" class="stack">
+    {% if errors.get('confirm') %}<p class="warning" role="alert">{{ errors['confirm'] }}</p>{% endif %}
+    <label>제목 <input name="title" value="{{ values.get('title', experiment.title) }}"></label>{{ err('title') }}
+    <label>가설 <textarea name="hypothesis" rows="2">{{ values.get('hypothesis', experiment.hypothesis) }}</textarea></label>{{ err('hypothesis') }}
+    <label>판정 기준 <textarea name="decision_rule" rows="2">{{ values.get('decision_rule', experiment.decision_rule) }}</textarea></label>{{ err('decision_rule') }}
+    {% if results.rows %}<label class="checkbox"><input type="checkbox" name="confirm" value="1"> 결과를 본 뒤 바꾸는 것임을 확인합니다(변경 이력에 남습니다)</label>{% endif %}
+    <button type="submit" class="button">저장</button>
+  </form>
+  {% if revisions %}
+  <h3>변경 이력</h3>
+  <ul class="drawer-list">
+    {% for r in revisions %}
+    <li><span class="muted">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }} UTC · {{ '가설' if r.field == 'hypothesis' else '판정 기준' }}</span>
+      <p><del>{{ r.old_value }}</del> → {{ r.new_value }}</p></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</details>
+{% endif %}
+
+{# 2. 입력 #}
+<section class="card">
+  <h2>입력</h2>
+  {% if start_baseline %}<p class="muted">출발 기준선: <span class="id">{{ start_baseline.short_id }}</span> {{ start_baseline.label }}</p>{% endif %}
+  <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/inputs" class="stack">
+    <fieldset class="plain">
+      <legend>데이터 버전</legend>
+      {% if versions %}
+        {% for v in versions %}
+        <label class="checkbox"><input type="checkbox" name="dataset_version" value="{{ v.version.id }}" {% if v.version.id|string in checked_ids %}checked{% endif %}>
+          {{ v.label }}<span class="muted"> · {{ v.version.source or '출처 미기록' }}{% if v.version.collected_at %} · {{ v.version.collected_at }}{% endif %}</span></label>
+        {% endfor %}
+      {% else %}
+        <p class="muted">등록한 데이터 버전이 없습니다.</p>
+      {% endif %}
+      <p><a href="/projects/{{ project.id }}/datasets?back=/projects/{{ project.id }}/experiments/{{ experiment.short_id }}">+ 데이터 버전 등록</a></p>
+      {{ err('inputs') }}
+    </fieldset>
+    <label>코드 버전 (커밋 SHA 또는 메모)
+      <input name="code_ref" value="{{ values.code_ref if 'code_ref' in values else (experiment.code_ref or '') }}" placeholder="예: a1b2c3d" spellcheck="false">
+    </label>
+    <label>설정
+      <textarea name="config_text" rows="3" spellcheck="false" placeholder="예: configs/summarize.yaml">{{ values.config_text if 'config_text' in values else (experiment.config_text or '') }}</textarea>
+    </label>
+    <button type="submit" class="button">입력 저장</button>
+  </form>
+</section>
+
+{# 3. 실행과 결과 #}
+<section class="card" id="results">
+  <h2>실행과 결과</h2>
+  {% if results.rows %}
+  <div class="table-wrap">
+    <table class="results">
+      <thead><tr><th scope="col">실행</th>{% for m in results.metrics %}<th scope="col">{{ m.key }}{% if m.criterion %}<br><span class="muted">{{ m.criterion.short_id }} {{ m.criterion.name }}</span>{% endif %}</th>{% endfor %}<th scope="col"></th></tr></thead>
+      <tbody>
+        {% for row in results.rows %}
+        <tr class="{% if row.exclusion %}excluded{% endif %}">
+          <th scope="row"><span class="id">{{ row.run.short_id }}</span> {{ row.run.label }}
+            {% for b in row.baselines %}<span class="chip" title="이 실행은 기준선 {{ b }}의 근거라 값을 바꿀 수 없습니다">{{ b }} 근거</span>{% endfor %}
+            {% if row.exclusion %}<br><span class="muted">제외: {{ row.exclusion.reason }}</span>{% endif %}</th>
+          {% for m in results.metrics %}<td>{{ row.display(m.key) }}</td>{% endfor %}
+          <td>{% if not row.exclusion %}
+            <details class="exclude">
+              <summary>제외</summary>
+              <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/runs/{{ row.run.short_id }}/exclude">
+                <label>이유 <input name="reason" placeholder="예: 로그 손상"></label>
+                {% if row.baselines %}<p class="hint">기준선 {{ row.baselines|join(', ') }}의 수치는 바뀌지 않습니다.</p>{% endif %}
+                <button type="submit" class="button">집계에서 제외</button>
+              </form>
+            </details>
+            {% endif %}
+            {% if errors.get('exclude-' ~ row.run.short_id) %}<p class="field-error">{{ errors['exclude-' ~ row.run.short_id] }}</p>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><th scope="row">집계 (제외 뺀 {{ results.included_count }}개)</th>{% for m in results.metrics %}<td><strong>{{ m.display }}</strong>{% if m.range_display %}<br><span class="muted">범위 {{ m.range_display }}</span>{% endif %}</td>{% endfor %}<td></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">아직 기록한 실행이 없습니다.</p>
+  {% endif %}
+
+  <details class="later" {% if errors.get('results') or not results.rows %}open{% endif %}>
+    <summary>결과 붙여넣기 (실행 × 지표 표)</summary>
+    <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/results" class="stack">
+      <p class="hint">첫 줄은 머리글(label과 지표 이름), 다음 줄부터 실행마다 한 줄씩. 탭·쉼표·공백으로 구분합니다. 스프레드시트에서 복사해 붙여넣어도 됩니다. 같은 이름의 실행은 값을 고칩니다.</p>
+      <textarea name="results" rows="6" spellcheck="false" class="mono" placeholder="{{ table_header }}&#10;seed=1&#9;19&#10;seed=2&#9;18"
+        {% if errors.get('results') %}aria-invalid="true" aria-describedby="results-error"{% endif %}>{{ values.get('results', '') }}</textarea>
+      {% if errors.get('results') %}<div class="field-error" id="results-error">{% for line in errors['results'].split('\n') %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
+      {% if inputs %}
+      <label>이 값을 잰 데이터 버전
+        <select name="dataset_version">
+          <option value="">기록하지 않음</option>
+          {% for v in inputs %}<option value="{{ v.version.id }}" {% if ('dataset_version' not in values and loop.first) or values.get('dataset_version') == v.version.id|string %}selected{% endif %}>{{ v.label }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <button type="submit" class="button primary">결과 기록</button>
+    </form>
+  </details>
+</section>
+
+{% if not is_baseline_measurement %}
+<section class="card">
+  <h2>판정</h2>
+  <p class="muted">채택·기각·보류 판정은 다음 단계에서 추가됩니다.</p>
+</section>
+{% endif %}
+{% endblock %}

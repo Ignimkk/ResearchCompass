@@ -58,7 +58,7 @@
     <h2>현재 기준선</h2>
     {% if baseline %}
     <p><span class="id">{{ baseline.short_id }}</span> {{ baseline.label }}</p>
-    <p class="muted">측정 실험 {{ baseline_experiment.short_id }} · {{ baseline_experiment.title }}</p>
+    <p class="muted">근거 실험 <a href="/projects/{{ project.id }}/experiments/{{ baseline_experiment.short_id }}">{{ baseline_experiment.short_id }} · {{ baseline_experiment.title }}</a></p>
     {% endif %}
   </section>
   <section class="card">

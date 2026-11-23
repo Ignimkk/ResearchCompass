@@ -21,6 +21,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -289,6 +290,8 @@ class Run(Base):
     __table_args__ = (
         UniqueConstraint("experiment_id", "short_id"),
         CheckConstraint(_not_blank("label"), name="label_not_blank"),
+        # 결과 표는 실행 이름으로 기존 실행을 찾으므로 실험 안에서 이름이 겹치면 안 됩니다(0002).
+        Index("uq_runs_experiment_id_label", "experiment_id", "label", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -75,7 +75,7 @@ def test_migrate_creates_then_reports_current(tmp_path: Path) -> None:
     second = runner.invoke(cli_app, ["migrate", "--data-dir", str(tmp_path)])
     assert "이미 최신" in second.output
     assert _status(tmp_path / "rcompass.db") is SchemaStatus.CURRENT
-    assert head_revision() == "0001"
+    assert head_revision() == "0002"
 
 
 def test_migrate_refuses_unknown_db(tmp_path: Path) -> None:

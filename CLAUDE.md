@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 3단계(문제 트리와 맥락 바)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 4단계(실험, 실행, 결과 수치)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -43,10 +43,15 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - `src/rcompass/migrations/`에 있습니다. 설치된 패키지에서도 `migrate`가 동작해야 하므로 패키지 안에 둡니다.
   - 새 마이그레이션은 `alembic.ini` 상단 주석의 명령으로 임시 DB에 autogenerate한 뒤 직접 검토합니다.
   - `alembic.ini`는 ASCII만 씁니다. Alembic이 로케일 인코딩으로 읽어 Windows에서 한글이 깨집니다.
-  - `test_migration_matches_models`가 모델과 마이그레이션의 차이를 잡습니다.
+  - `test_migration_matches_models`가 모델과 마이그레이션의 차이를 잡습니다. 이전 리비전에서 올라가는 경로는 `tests/test_migrations.py`에서 검증합니다.
+  - 다른 표가 외래 키로 참조하는 표(예: `runs`)에 제약을 더할 때는 `batch_alter_table`(표 재생성)을 피하고 `op.create_index(..., unique=True)`를 씁니다. 외래 키 검사가 켜진 상태에서는 표를 다시 만들다 실패할 수 있습니다(0002 참고).
 - **추가만 가능한 표**(`models.APPEND_ONLY_TABLES`: 결정, 기준선, 기준선 실행 스냅샷, 기준선 변경, 실행 제외):
   - SQLite 트리거가 UPDATE와 DELETE를 막습니다.
   - 배치 마이그레이션은 표를 다시 만들며 트리거를 지우므로, `upgrade_to_head`가 끝날 때 `ensure_append_only_triggers`가 되살립니다. 추가만 가능한 표를 새로 만들면 `APPEND_ONLY_TABLES`에 넣으세요.
+- **결과 기록**([services/runs.py](src/rcompass/services/runs.py)):
+  - 결과는 "실행 × 지표" 표(첫 줄 머리글, 탭·쉼표·공백 구분)로 받습니다. 실행은 실험 안에서 이름으로 찾습니다(이름은 고유 인덱스).
+  - 기준선 스냅샷(`BaselineRun`)에 든 실행은 값이든 메타데이터든 다시 쓰지 않습니다.
+  - E0에 새 실행을 기록하면, B0이 현재 기준선일 때만 `snapshot_update`로 B0 근거를 넓힙니다.
 - **짧은 ID**([ids.py](src/rcompass/ids.py)): 모두 1부터 발급합니다. `E0`(기준선 측정 실험)과 `B0`은 프로젝트를 만들 때 `BASELINE_MEASUREMENT_ID`와 `BASELINE_ZERO_ID`로 직접 붙입니다. 실행 ID는 `scope=f"R:{experiment_id}"`로 실험마다 R1부터 시작합니다.
 - 이후 단계에서 지킬 도메인 규칙(계획서 4절):
   - `Decision`과 `BaselineChange`는 추가만 가능하고, 수정하거나 삭제하는 API를 만들지 않습니다.

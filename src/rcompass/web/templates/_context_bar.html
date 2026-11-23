@@ -15,5 +15,6 @@
   <div class="project-tabs">
     <a href="/projects/{{ project.id }}" {% if section == 'home' %}aria-current="page"{% endif %}>홈</a>
     <a href="/projects/{{ project.id }}/problems" {% if section == 'problems' %}aria-current="page"{% endif %}>문제 트리</a>
+    <a href="/projects/{{ project.id }}/datasets" {% if section == 'materials' %}aria-current="page"{% endif %}>자료</a>
   </div>
 </nav>

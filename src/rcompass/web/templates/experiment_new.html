@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}새 실험 · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% macro err(name) %}{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
+{% macro inv(name) %}{% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
+{% block content %}
+<h1>새 실험</h1>
+<p class="muted">문제 <span class="id">{{ problem.short_id }}</span> {{ problem.title }} · 출발 기준선은 현재 기준선{% if baseline %} <span class="id">{{ baseline.short_id }}</span> {{ baseline.label }}{% endif %}입니다.</p>
+{% if errors %}<div class="error-summary" role="alert"><p><strong>입력을 확인해 주세요.</strong></p></div>{% endif %}
+<form method="post" action="/projects/{{ project.id }}/experiments" class="stack">
+  <input type="hidden" name="problem" value="{{ problem.short_id }}">
+  <section class="card stack">
+    <p class="hint">실험 전에 적는 것: 결과를 본 뒤 가설이나 기준을 맞추지 않도록 먼저 기록합니다.</p>
+    <label>실험 제목 <span class="req">필수</span>
+      <input name="title" value="{{ values.get('title', '') }}" placeholder="예: few-shot 예시 3개 추가" {{ inv('title') }}>
+    </label>
+    {{ err('title') }}
+    <label>가설 <span class="req">필수</span>
+      <textarea name="hypothesis" rows="2" placeholder="예: 장문 문항에 예시를 넣으면 장문 오답이 줄어든다" {{ inv('hypothesis') }}>{{ values.get('hypothesis', '') }}</textarea>
+    </label>
+    {{ err('hypothesis') }}
+    <label>판정 기준 <span class="req">필수</span>
+      <textarea name="decision_rule" rows="2" placeholder="예: 평균 오답 ≤ 17이면 채택, ≥ 18이면 기각 (실행 3개 이상)" {{ inv('decision_rule') }}>{{ values.get('decision_rule', '') }}</textarea>
+    </label>
+    {{ err('decision_rule') }}
+  </section>
+  <details class="card later">
+    <summary>코드 버전과 설정 (나중에 채워도 됩니다)</summary>
+    <div class="stack">
+      <label>코드 버전 (커밋 SHA 또는 메모)
+        <input name="code_ref" value="{{ values.get('code_ref', '') }}" placeholder="예: a1b2c3d" spellcheck="false">
+      </label>
+      <label>설정
+        <textarea name="config_text" rows="3" placeholder="예: configs/fewshot.yaml 또는 핵심 설정값" spellcheck="false">{{ values.get('config_text', '') }}</textarea>
+      </label>
+    </div>
+  </details>
+  <div class="actions">
+    <button type="submit" class="button primary">실험 만들기</button>
+    <a class="button" href="/projects/{{ project.id }}/problems/{{ problem.short_id }}">취소</a>
+  </div>
+</form>
+{% endblock %}

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from rcompass.models import Problem, ProblemStatus, Project
 from rcompass.services import ValidationError
+from rcompass.services.experiments import problem_experiments
 from rcompass.services.problems import (
     OUTCOME_SYMBOLS,
     STATUS_LABELS,
@@ -119,7 +120,8 @@ def problem_page(request: Request, project_id: int, short_id: str, session: Sess
         request,
         "problem_detail.html",
         {**context, **_common(), "problem": problem, "children": child_problems(session, problem),
-         "is_focus": project.focus_problem_id == problem.id},
+         "is_focus": project.focus_problem_id == problem.id,
+         "experiments": problem_experiments(session, problem)},
     )
 
 
