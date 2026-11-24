@@ -30,12 +30,14 @@ from rcompass.models import (
     ExperimentOutcome,
     ExperimentStatus,
     FileKind,
+    FileObject,
     Problem,
     Project,
     StorageKind,
 )
 from rcompass.services.aggregate import format_aggregated, format_plain
 from rcompass.services.datasets import VersionView
+from rcompass.services.diagrams import BASIS_LABELS, KIND_LABELS, freshness, list_diagrams
 from rcompass.services.decisions import judgment
 from rcompass.services.experiments import input_versions
 from rcompass.services.files import list_files
@@ -269,7 +271,9 @@ def build_handoff(session: Session, project: Project, options: HandoffOptions) -
         add(f"- {record.short_id} {one_line(record.original_name)} ← {owners[record.produced_by_experiment_id]}")
     if len(files) > MAX_FILES:
         add(f"- 그 밖의 파일 {len(files) - MAX_FILES}개는 앱의 자료 화면에서 확인하세요.")
-    if not versions and not files:
+    diagram_lines = _diagram_lines(session, project)
+    lines.extend(diagram_lines)
+    if not versions and not files and not diagram_lines:
         add("기록한 자료가 없습니다.")
     add("")
 
@@ -286,3 +290,22 @@ def build_handoff(session: Session, project: Project, options: HandoffOptions) -
     add("실험이 끝나면 아래 블록만 출력하세요. 연구자가 확인한 뒤 기록합니다. 재지 않은 지표는 비워 두세요.")
     lines.extend(result_block_template(session, project, template_experiment))
     return "\n".join(lines) + "\n"
+
+
+def _diagram_lines(session: Session, project: Project) -> list[str]:
+    """종류마다 가장 최근에 등록한 구조도 한 줄. 현재 기준선과 어긋나면 그 사실을 붙입니다."""
+    latest = {}
+    for diagram in list_diagrams(session, project.id):  # 최근 등록 순
+        latest.setdefault(diagram.kind, diagram)
+    lines = []
+    for diagram in latest.values():
+        html = session.get(FileObject, diagram.file_id)
+        basis = BASIS_LABELS[diagram.basis] + (f", {diagram.commit_sha[:7]}" if diagram.commit_sha else "")
+        line = f"- {KIND_LABELS[diagram.kind]}: {one_line(diagram.title)} ({basis}) — {diagram.short_id}"
+        if html is not None and html.original_name:
+            line += f" {one_line(html.original_name)}"
+        fresh = freshness(session, project, diagram)
+        if fresh is not None and fresh.stale:
+            line += " · 주의: 현재 기준선과 어긋남"
+        lines.append(line)
+    return lines

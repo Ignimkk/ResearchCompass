@@ -1,0 +1,645 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "compare",
+  "type": "architecture",
+  "comparatorVersion": 1,
+  "canonicalVersion": 1,
+  "completeness": "complete",
+  "proofLevel": "authored",
+  "base": {
+    "title": "연구 나침반 v0.1 구조 (계획 단계 예상)",
+    "rawSha256": "e39e4e27cb8faa2c36e9188fc5ed1fb6ee65d2737cf88d24569d373e33c29fe3",
+    "semanticSha256": "84301995a443da70ad007de16372f653ce6c56d0decba627ab05b0e2cebb59cc",
+    "bytes": 4311
+  },
+  "head": {
+    "title": "연구 나침반 코드 구조 (9단계, 코드 근거)",
+    "rawSha256": "33ad9e55c095bb9bb62ab5e4b869b86a952c71fe2040976e06012d3c948554d9",
+    "semanticSha256": "ffdb958e87ac6b6806dc890c661d4803a2fcab1cd3ebe526739163e4c1f2fedd",
+    "bytes": 9055,
+    "revision": "b23aadcde0239584c26ceeefbba3775ac347617a"
+  },
+  "summary": {
+    "components": {
+      "added": 7,
+      "changed": 3,
+      "evidenceChanged": 1,
+      "removed": 3,
+      "moved": 2
+    },
+    "connections": {
+      "added": 19,
+      "changed": 0,
+      "removed": 8,
+      "rerouted": 0
+    },
+    "boundaries": {
+      "added": 0,
+      "changed": 2,
+      "removed": 0,
+      "geometryChanged": 0
+    },
+    "presentationChanged": true,
+    "provenanceChanged": true
+  },
+  "changes": {
+    "components": [
+      {
+        "id": "archify",
+        "baseLabel": "Archify 스킬",
+        "status": "removed",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "backup",
+        "headLabel": "백업·복구",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "backups",
+        "headLabel": "백업 zip",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "blobs",
+        "headLabel": "첨부 파일 저장소",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "claude",
+        "baseLabel": "Claude Code 세션",
+        "headLabel": "Claude Code 세션",
+        "status": "evidence-changed",
+        "classifications": [
+          "evidence",
+          "geometry"
+        ],
+        "changedFields": [
+          "/pos",
+          "/size",
+          "/sources"
+        ]
+      },
+      {
+        "id": "cli",
+        "baseLabel": "rcompass CLI",
+        "headLabel": "rcompass CLI",
+        "status": "changed",
+        "classifications": [
+          "evidence",
+          "geometry",
+          "semantic"
+        ],
+        "changedFields": [
+          "/pos",
+          "/size",
+          "/sources",
+          "/sublabel"
+        ]
+      },
+      {
+        "id": "db",
+        "baseLabel": "SQLite",
+        "headLabel": "SQLite",
+        "status": "changed",
+        "classifications": [
+          "evidence",
+          "geometry",
+          "semantic"
+        ],
+        "changedFields": [
+          "/pos",
+          "/size",
+          "/sources",
+          "/tag"
+        ]
+      },
+      {
+        "id": "domain",
+        "headLabel": "기록 서비스",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "extdata",
+        "baseLabel": "외부 데이터",
+        "headLabel": "외부 데이터",
+        "status": "moved",
+        "classifications": [
+          "geometry"
+        ],
+        "changedFields": [
+          "/pos",
+          "/size"
+        ]
+      },
+      {
+        "id": "files",
+        "baseLabel": "첨부 파일 저장소",
+        "status": "removed",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "filesvc",
+        "headLabel": "첨부·지문",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "guard",
+        "headLabel": "LocalOnly 미들웨어",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "handoff",
+        "headLabel": "인계·결과 블록",
+        "status": "added",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "researcher",
+        "baseLabel": "연구자",
+        "headLabel": "연구자",
+        "status": "moved",
+        "classifications": [
+          "geometry"
+        ],
+        "changedFields": [
+          "/pos",
+          "/size"
+        ]
+      },
+      {
+        "id": "services",
+        "baseLabel": "서비스 계층",
+        "status": "removed",
+        "classifications": [
+          "semantic"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web",
+        "baseLabel": "웹 화면",
+        "headLabel": "웹 라우트",
+        "status": "changed",
+        "classifications": [
+          "evidence",
+          "geometry",
+          "semantic"
+        ],
+        "changedFields": [
+          "/label",
+          "/pos",
+          "/size",
+          "/sources",
+          "/sublabel",
+          "/tag"
+        ]
+      }
+    ],
+    "connections": [
+      {
+        "id": "archify-web",
+        "base": {
+          "from": "archify",
+          "to": "web",
+          "label": "구조도 HTML 등록"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "backup-backups",
+        "head": {
+          "from": "backup",
+          "to": "backups",
+          "label": "zip 쓰기·검증"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "backup-blobs",
+        "head": {
+          "from": "backup",
+          "to": "blobs",
+          "label": "참조 파일만 묶기"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "backup-db",
+        "head": {
+          "from": "backup",
+          "to": "db",
+          "label": "스냅샷·복구 교체"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "claude-cli",
+        "base": {
+          "from": "claude",
+          "to": "cli",
+          "label": "rcompass handoff"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "cli-backup",
+        "head": {
+          "from": "cli",
+          "to": "backup",
+          "label": "backup·restore"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "cli-handoff",
+        "head": {
+          "from": "cli",
+          "to": "handoff",
+          "label": "handoff"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "cli-services",
+        "base": {
+          "from": "cli",
+          "to": "services",
+          "label": "같은 서비스 호출"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "cli-web",
+        "head": {
+          "from": "cli",
+          "to": "web",
+          "label": "serve (uvicorn)"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "domain-db",
+        "head": {
+          "from": "domain",
+          "to": "db",
+          "label": "SQL · BEGIN IMMEDIATE"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "filesvc-blobs",
+        "head": {
+          "from": "filesvc",
+          "to": "blobs",
+          "label": "sha256 주소 저장"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "filesvc-extdata",
+        "head": {
+          "from": "filesvc",
+          "to": "extdata",
+          "label": "읽기 전용 해시"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "guard-web",
+        "head": {
+          "from": "guard",
+          "to": "web",
+          "label": "검사 통과"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "handoff-db",
+        "head": {
+          "from": "handoff",
+          "to": "db",
+          "label": "인계용 읽기"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "handoff-domain",
+        "head": {
+          "from": "handoff",
+          "to": "domain",
+          "label": "확인 후 기록"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "researcher-cli",
+        "head": {
+          "from": "researcher",
+          "to": "cli",
+          "label": "명령 실행"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "researcher-guard",
+        "head": {
+          "from": "researcher",
+          "to": "guard",
+          "label": "HTTP 127.0.0.1"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "researcher-web",
+        "base": {
+          "from": "researcher",
+          "to": "web",
+          "label": "HTTP 127.0.0.1"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "result-block",
+        "head": {
+          "from": "claude",
+          "to": "researcher",
+          "label": "rcompass-result 블록"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "services-db",
+        "base": {
+          "from": "services",
+          "to": "db",
+          "label": "SQL"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "services-extdata",
+        "base": {
+          "from": "services",
+          "to": "extdata",
+          "label": "위치·sha256만 기록"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "services-files",
+        "base": {
+          "from": "services",
+          "to": "files",
+          "label": "sha256 주소 저장"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web-backup",
+        "head": {
+          "from": "web",
+          "to": "backup",
+          "label": "지금 백업"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web-domain",
+        "head": {
+          "from": "web",
+          "to": "domain",
+          "label": "기록·판정"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web-filesvc",
+        "head": {
+          "from": "web",
+          "to": "filesvc",
+          "label": "첨부·지문 계산"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web-handoff",
+        "head": {
+          "from": "web",
+          "to": "handoff",
+          "label": "인계·결과 붙여넣기"
+        },
+        "status": "added",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      },
+      {
+        "id": "web-services",
+        "base": {
+          "from": "web",
+          "to": "services",
+          "label": "서비스 호출"
+        },
+        "status": "removed",
+        "classifications": [
+          "topology"
+        ],
+        "changedFields": []
+      }
+    ],
+    "boundaries": [
+      {
+        "key": "region:rcompass 앱 · 127.0.0.1 전용",
+        "kind": "region",
+        "label": "rcompass 앱 · 127.0.0.1 전용",
+        "status": "changed",
+        "classifications": [
+          "scope"
+        ],
+        "changedFields": [
+          "/wraps"
+        ]
+      },
+      {
+        "key": "region:데이터 디렉터리 (저장소 밖)",
+        "kind": "region",
+        "label": "데이터 디렉터리 (저장소 밖)",
+        "status": "changed",
+        "classifications": [
+          "scope"
+        ],
+        "changedFields": [
+          "/wraps"
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "changedFields": [
+      "/repository"
+    ],
+    "base": null,
+    "head": {
+      "revision": "b23aadcde0239584c26ceeefbba3775ac347617a",
+      "provider": "github"
+    }
+  },
+  "identity": {
+    "components": "components[].id",
+    "connections": "connections[].id (required)",
+    "boundaries": "boundaries[].kind + boundaries[].label (derived)"
+  },
+  "view": {
+    "visualPreset": "classic"
+  },
+  "limitations": [
+    "Authored Architecture IR only; no runtime impact, causality, risk, or mergeability is inferred.",
+    "Boundary identity is conservatively derived from kind + label."
+  ],
+  "artifact": {
+    "sha256": "e98b3cc08cfb6dba6da16e654178d17a39bb2ccd0fdece17d3bb9e531fa26583",
+    "bytes": 2481192
+  },
+  "validation": {
+    "checksPassed": 28,
+    "checkCount": 28,
+    "baseComposition": "pass",
+    "headComposition": "pass"
+  }
+}

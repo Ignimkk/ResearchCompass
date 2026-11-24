@@ -204,6 +204,14 @@ ID는 프로젝트 안에서 사람이 읽을 수 있는 짧은 번호(P3, E7, B
 - 외부 참조 점검: 로컬·NAS 절대 경로만 확인합니다(URL과 상대 경로는 "확인 안 함"). 크기가 다르면 해시 없이 "지문 불일치"이고, sha256이 기록되어 있으면 계산합니다. 큰 파일은 `--skip-hash`로 건너뜁니다. 네트워크 경로(UNC, `file://host`)는 `--check-network`를 줄 때만 확인합니다. 남이 만든 zip의 manifest에 공격자 호스트 경로를 넣으면 Windows가 그 호스트로 NTLM 인증을 보내기 때문입니다.
 - 예제 프로젝트(`rcompass init --example`)는 7절 시나리오 1~4(기각 E1, 채택 E2 → B1)까지입니다. 응답 시간이 미측정이라 홈에서 바로 "측정 실험 만들기"로 이어집니다. 같은 제목의 예제가 있으면 다시 만들지 않습니다.
 
+10단계 구현에서 정한 사항은 다음과 같습니다.
+- 구조도 짧은 ID는 `G`(G1, G2, …)입니다. 구조도 화면은 프로젝트 탭의 "구조도"(`/projects/{id}/diagrams`)에 둡니다.
+- 올린 HTML은 남이 만든 것일 수 있으므로 앱과 같은 출처로 실행하지 않습니다. 상세 화면의 iframe에는 `sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads"`를 붙이고(`allow-same-origin` 없음), HTML 응답(`/diagrams/G1/view`)에도 같은 권한의 CSP `sandbox`를 붙입니다. 그래서 주소를 새 탭에서 직접 열어도 불투명 출처로 실행됩니다. `connect-src 'none'`으로 네트워크 요청을, `frame-ancestors 'self'`로 다른 사이트의 틀 넣기를 막습니다. 팝업은 SRC 링크(GitHub)를 새 창으로 열기 위해, 다운로드는 Archify의 내보내기 버튼을 위해 허용합니다.
+- 코드 근거 구조도는 전체 커밋 SHA(40자)와 관련 파일(저장소 기준 상대 경로, 최대 50개)이 필수입니다. JSON IR을 함께 올리면 비운 칸을 `meta.repository`(url, revision)와 노드 `sources[].path`로 채웁니다. 저장소 주소는 http(s)만 받고, GitHub·GitLab이면 관련 파일을 고정 커밋의 파일 주소로 링크합니다.
+- "구조도가 기준선보다 오래됨" 배지: 앱은 Git을 읽지 않으므로 커밋의 선후는 모릅니다. 연구 저장소 코드 근거 구조도는 현재 기준선을 만든 실험의 코드 버전(커밋 SHA처럼 보일 때만)과 구조도 커밋을 비교하고, 다르면 기준선이 구조도보다 나중에 정해졌을 때 "오래됨", 아니면 "다른 커밋"으로 표시합니다. 연구 절차도는 만든 뒤 기준선이 바뀌었으면 "오래됨"입니다. 웹앱 코드 구조도는 기준선과 비교하지 않습니다.
+- 인계 Markdown의 "관련 자료"에는 종류마다 가장 최근에 등록한 구조도 한 줄을 넣고, 기준선과 어긋나면 그 사실을 붙입니다.
+- 웹앱의 첫 코드 근거 구조도(`docs/architecture/code-v0.1.*`)는 푸시된 9단계 커밋 `b23aadc`에 고정했습니다. `planned-v0.1`과의 `compare` 결과는 `docs/architecture/compare-planned-to-code-v0.1.html`에 있습니다.
+
 | 엔터티 | 주요 필드 | 관계 |
 |---|---|---|
 | Project | title, question, next_action, focus_problem_id, current_baseline_id(캐시) | 1:N로 아래 엔터티 전부를 가짐 |
@@ -321,7 +329,7 @@ B1 문단 요약 v1 (E2에서 2026-11-18 채택) · 코드 a1b2c3d · 설정 con
 ## 관련 자료
 - DS1 eval-100 v1.0 (내부 QA 수집, 2026-11-02) — D:/data/eval100_v1.jsonl
 - F4 오답유형_E2.png ← E2
-- 코드 구조도: qa-bot 구조 (코드 근거, a1b2c3d) — docs/arch/qa-bot.html
+- 연구 저장소 코드·데이터 흐름도: qa-bot 구조 (코드 근거, a1b2c3d) — G1 qa-bot.html
 
 ## 다음 행동
 E2 설정으로 100문항 평균 응답 시간을 측정한다.

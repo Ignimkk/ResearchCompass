@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}구조도 · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% macro err(name) %}{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
+{% macro invalid(name) %}{% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
+{% block content %}
+<h1>구조도</h1>
+<p class="hint">Claude Code에서 Archify 스킬로 만든 구조도 HTML을 올려 두고, 근거와 한국어 설명을 함께 봅니다. 앱은 구조도를 만들거나 연구 저장소를 읽지 않습니다.</p>
+
+<section class="card">
+  <h2>등록한 구조도 {{ diagrams|length }}개</h2>
+  {% if diagrams %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">구조도</th><th scope="col">종류</th><th scope="col">근거</th><th scope="col">커밋</th><th scope="col">등록</th></tr></thead>
+      <tbody>
+        {% for d in diagrams %}
+        {% set fresh = freshness[d.id] %}
+        <tr>
+          <td><a href="/projects/{{ project.id }}/diagrams/{{ d.short_id }}"><span class="id">{{ d.short_id }}</span> {{ d.title }}</a>
+            {% if fresh and fresh.stale %}<br><span class="chip chip-stale" title="{{ fresh.message }}">기준선과 어긋남</span>{% endif %}</td>
+          <td>{{ kind_labels[d.kind] }}</td>
+          <td><span class="chip chip-basis-{{ d.basis.value }}">{{ basis_labels[d.basis] }}</span></td>
+          <td>{% if d.commit_sha %}<code>{{ d.commit_sha[:7] }}</code>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{{ d.created_at.strftime('%Y-%m-%d') }} UTC</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">등록한 구조도가 없습니다.</p>
+  {% endif %}
+</section>
+
+<section class="card" id="register">
+  <h2>구조도 등록</h2>
+  <p class="hint">코드 근거 구조도는 <strong>원격에 푸시된 커밋</strong>에서 만들고, 그 커밋의 전체 SHA와 근거 파일을 적습니다. JSON IR을 함께 올리면 비워 둔 저장소 주소, 커밋, 관련 파일을 IR의 <code>meta.repository</code>와 <code>sources</code>에서 채웁니다.</p>
+  {% if errors %}<div class="error-summary" role="alert"><p><strong>입력을 확인해 주세요.</strong></p></div>{% endif %}
+  <form method="post" action="/projects/{{ project.id }}/diagrams" enctype="multipart/form-data" class="stack">
+    <label>제목 <span class="req">필수</span>
+      <input name="title" value="{{ values.get('title', '') }}" placeholder="예: qa-bot 구조" {{ invalid('title') }}></label>
+    {{ err('title') }}
+    <div class="grid">
+      <label class="span-2">종류 <span class="req">필수</span>
+        <select name="kind" {{ invalid('kind') }}>
+          {% for k in kinds %}<option value="{{ k.value }}" {% if values.get('kind', 'research_repo') == k.value %}selected{% endif %}>{{ kind_labels[k] }}</option>{% endfor %}
+        </select></label>
+      <label class="span-2">근거 구분 <span class="req">필수</span>
+        <select name="basis" {{ invalid('basis') }}>
+          {% for b in bases %}<option value="{{ b.value }}" {% if values.get('basis', 'code_backed') == b.value %}selected{% endif %}>{{ basis_labels[b] }}</option>{% endfor %}
+        </select></label>
+    </div>
+    {{ err('kind') }}{{ err('basis') }}
+    <label>구조도 HTML <span class="req">필수</span>
+      <input name="html" type="file" accept=".html,.htm,text/html" {{ invalid('html') }}></label>
+    {{ err('html') }}
+    <label>JSON IR (선택)
+      <input name="json_ir" type="file" accept=".json,application/json" {{ invalid('json_ir') }}></label>
+    {{ err('json_ir') }}
+    <label>저장소 원격 주소
+      <input name="repo_url" value="{{ values.get('repo_url', '') }}" placeholder="https://github.com/me/qa-bot" spellcheck="false" {{ invalid('repo_url') }}></label>
+    {{ err('repo_url') }}
+    <label>커밋 (전체 SHA 40자, 코드 근거일 때 필수)
+      <input name="commit_sha" value="{{ values.get('commit_sha', '') }}" spellcheck="false" class="mono" placeholder="git rev-parse HEAD" {{ invalid('commit_sha') }}></label>
+    {{ err('commit_sha') }}
+    <label>관련 파일 (한 줄에 하나, 저장소 기준 상대 경로, 코드 근거일 때 필수)
+      <textarea name="related_paths" rows="3" spellcheck="false" class="mono" placeholder="src/app.py&#10;src/pipeline/summarize.py" {{ invalid('related_paths') }}>{{ values.get('related_paths', '') }}</textarea></label>
+    {{ err('related_paths') }}
+    <label>쉬운 한국어 설명 ("이 그림에서 볼 것", 3~6문장)
+      <textarea name="explanation" rows="4" {{ invalid('explanation') }}>{{ values.get('explanation', '') }}</textarea></label>
+    {{ err('explanation') }}
+    <fieldset class="plain">
+      <legend>연결 (선택)</legend>
+      <div class="grid">
+        <label class="span-2">문제
+          <select name="problem"><option value="">없음</option>
+            {% for p in problems %}<option value="{{ p.short_id }}" {% if values.get('problem') == p.short_id %}selected{% endif %}>{{ p.short_id }} {{ p.title }}</option>{% endfor %}
+          </select></label>
+        <label class="span-2">실험
+          <select name="experiment"><option value="">없음</option>
+            {% for e in experiments %}<option value="{{ e.short_id }}" {% if values.get('experiment') == e.short_id %}selected{% endif %}>{{ e.short_id }} {{ e.title }}</option>{% endfor %}
+          </select></label>
+        <label class="span-2">기준선
+          <select name="baseline"><option value="">없음</option>
+            {% for b in baselines %}<option value="{{ b.short_id }}" {% if values.get('baseline') == b.short_id %}selected{% endif %}>{{ b.short_id }} {{ b.label }}</option>{% endfor %}
+          </select></label>
+      </div>
+    </fieldset>
+    {{ err('links') }}
+    <button type="submit" class="button primary">등록</button>
+  </form>
+</section>
+{% endblock %}

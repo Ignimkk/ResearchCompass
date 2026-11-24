@@ -6,7 +6,21 @@
 
 | 그림 | 근거 | 기준 | 상태 |
 |---|---|---|---|
-| [v0.1 구조 (계획 단계 예상)](planned-v0.1.html) | 계획서만. 코드 근거 없음 | [구현 계획서](../implementation-plan.md) 6절, 2026-11-20 | 현재 유효 |
+| [코드 구조 (9단계, 코드 근거)](code-v0.1.html) | 코드 근거. 노드마다 SRC 링크 | 커밋 `b23aadc` (9단계 완료, 2026-11-24) | 현재 유효 |
+| [계획 → 코드 비교](compare-planned-to-code-v0.1.html) | `archify compare` 결과 | `planned-v0.1.json` → `code-v0.1.json` | 참고 |
+| [v0.1 구조 (계획 단계 예상)](planned-v0.1.html) | 계획서만. 코드 근거 없음 | [구현 계획서](../implementation-plan.md) 6절, 2026-11-20 | 코드 근거 구조도로 대체 |
+
+### 코드 구조 (9단계, 코드 근거)
+
+**이 그림에서 볼 것**: 연구자의 브라우저 요청은 먼저 **LocalOnly 미들웨어**를 지나야 합니다. 이 미들웨어는 Host가 127.0.0.1이나 localhost인지, 상태를 바꾸는 요청의 Origin이 같은 서버인지 확인합니다. 통과한 요청은 **웹 라우트**가 받아 네 서비스로 나눠 보냅니다. **기록 서비스**는 실험, 실행, 결정, 기준선을 SQLite에 쓰고, **첨부·지문**은 파일을 sha256 주소로 저장하거나 외부 데이터를 읽기 전용으로 해시합니다. **인계·결과 블록**은 인계 Markdown을 만들고, 확인한 결과 블록만 기록 서비스로 넘깁니다. **백업·복구**는 DB 스냅샷과 기록이 가리키는 첨부만 zip에 담습니다. 터미널의 **rcompass CLI**는 서버를 띄우고, 백업·복구와 인계를 같은 서비스로 처리합니다.
+
+**읽는 법**: 노드를 누르면 근거 파일과 줄 범위(SRC)가 나오고, GitHub의 `b23aadc` 커밋으로 이동합니다. CLI에서 인계로 가는 선과 웹에서 백업으로 가는 선이 한 번 교차합니다. CLI가 내부 서비스 세 곳을 부르기 때문에 생기는 교차이고, 연결 관계는 정확합니다.
+
+**빠진 것**: 10단계 구조도 등록(sandbox iframe으로 보는 화면)은 이 커밋 뒤의 변경이라 그림에 없습니다. 11단계를 마친 뒤 다시 만듭니다.
+
+### 계획 → 코드 비교
+
+[비교 그림](compare-planned-to-code-v0.1.html)은 계획 단계 예상 구조와 실제 코드 구조의 차이를 보여줍니다. 계획에서는 "서비스 계층" 하나였던 상자가 실제로는 기록, 첨부·지문, 인계·결과 블록, 백업·복구 네 서비스로 나뉘었습니다. 웹 앞단에는 Host·Origin을 검사하는 미들웨어가 생겼고, 백업 zip 저장소가 데이터 디렉터리에 더해졌습니다. "Archify 스킬 → 웹 화면" 연결은 10단계에서 구현하므로 비교 그림에서는 빠진 것으로 나옵니다.
 
 ### v0.1 구조 (계획 단계 예상)
 
@@ -31,4 +45,6 @@
 npx -y skills@latest add https://archify.si --skill archify --agent claude-code --copy --yes
 node .claude/skills/archify/bin/archify.mjs doctor
 node .claude/skills/archify/bin/archify.mjs finalize architecture docs/architecture/planned-v0.1.json docs/architecture/planned-v0.1.html --quality showcase --json
+node .claude/skills/archify/bin/archify.mjs finalize architecture docs/architecture/code-v0.1.json docs/architecture/code-v0.1.html --repo-root . --quality showcase --json
+node .claude/skills/archify/bin/archify.mjs compare architecture docs/architecture/planned-v0.1.json docs/architecture/code-v0.1.json docs/architecture/compare-planned-to-code-v0.1.html --repo-root . --json
 ```

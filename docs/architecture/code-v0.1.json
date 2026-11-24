@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "연구 나침반 코드 구조 (9단계, 코드 근거)",
+    "locale": "ko",
+    "output": "docs/architecture/code-v0.1.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Ignimkk/ResearchCompass.git",
+      "revision": "b23aadcde0239584c26ceeefbba3775ac347617a",
+      "provider": "github"
+    }
+  },
+  "components": [
+    { "id": "claude", "type": "external", "label": "Claude Code 세션", "sublabel": "연구 저장소에서 실행", "pos": [40, 40], "size": [170, 64],
+      "sources": [{ "path": "integrations/claude-code/rcompass-result/SKILL.md", "line": 1, "end_line": 30, "label": "rcompass-result 스킬" }] },
+    { "id": "researcher", "type": "external", "label": "연구자", "sublabel": "브라우저·터미널", "icon": "person", "pos": [40, 340], "size": [170, 64] },
+    { "id": "guard", "type": "security", "label": "LocalOnly 미들웨어", "sublabel": "Host·Origin 검사", "pos": [330, 340], "size": [170, 64],
+      "sources": [
+        { "path": "src/rcompass/web/security.py", "line": 79, "end_line": 94, "label": "Host·Origin 검사" },
+        { "path": "src/rcompass/web/app.py", "line": 45, "end_line": 46, "label": "미들웨어 등록" }
+      ] },
+    { "id": "web", "type": "frontend", "label": "웹 라우트", "sublabel": "FastAPI + Jinja2 SSR", "tag": "routes/", "pos": [600, 170], "size": [180, 454],
+      "sources": [
+        { "path": "src/rcompass/web/app.py", "line": 30, "end_line": 73, "label": "create_app" },
+        { "path": "src/rcompass/web/routes/materials.py", "line": 101, "end_line": 105, "label": "DB 전에 첨부 저장" },
+        { "path": "src/rcompass/web/routes/handoff.py", "line": 100, "end_line": 132, "label": "확인하고 기록" }
+      ] },
+    { "id": "cli", "type": "frontend", "label": "rcompass CLI", "sublabel": "Typer 명령", "pos": [600, 720], "size": [180, 64],
+      "sources": [
+        { "path": "src/rcompass/cli.py", "line": 51, "end_line": 67, "label": "serve" },
+        { "path": "src/rcompass/cli.py", "line": 70, "end_line": 100, "label": "migrate" },
+        { "path": "src/rcompass/cli.py", "line": 167, "end_line": 203, "label": "restore" }
+      ] },
+    { "id": "extdata", "type": "external", "label": "외부 데이터", "sublabel": "로컬·NAS 경로, URL", "pos": [930, 40], "size": [200, 64] },
+    { "id": "filesvc", "type": "backend", "label": "첨부·지문", "sublabel": "files.py · datasets.py", "pos": [930, 170], "size": [200, 64],
+      "sources": [
+        { "path": "src/rcompass/services/files.py", "line": 76, "end_line": 102, "label": "store_stream" },
+        { "path": "src/rcompass/services/files.py", "line": 256, "end_line": 264, "label": "fingerprint_file" },
+        { "path": "src/rcompass/services/datasets.py", "line": 175, "end_line": 178, "label": "compute_fingerprint" }
+      ] },
+    { "id": "domain", "type": "backend", "label": "기록 서비스", "sublabel": "실험·실행·결정·기준선", "pos": [930, 300], "size": [200, 64],
+      "sources": [
+        { "path": "src/rcompass/services/decisions.py", "line": 172, "end_line": 232, "label": "decide" },
+        { "path": "src/rcompass/services/runs.py", "line": 159, "end_line": 243, "label": "record_results" }
+      ] },
+    { "id": "handoff", "type": "backend", "label": "인계·결과 블록", "sublabel": "handoff · result_block", "pos": [930, 430], "size": [200, 64],
+      "sources": [
+        { "path": "src/rcompass/services/handoff.py", "line": 182, "end_line": 288, "label": "build_handoff" },
+        { "path": "src/rcompass/services/result_block.py", "line": 301, "end_line": 341, "label": "confirm_results" }
+      ] },
+    { "id": "backup", "type": "backend", "label": "백업·복구", "sublabel": "backup.py", "pos": [930, 560], "size": [200, 64],
+      "sources": [
+        { "path": "src/rcompass/services/backup.py", "line": 299, "end_line": 362, "label": "_create_backup" },
+        { "path": "src/rcompass/services/backup.py", "line": 583, "end_line": 604, "label": "restore_backup" }
+      ] },
+    { "id": "blobs", "type": "database", "label": "첨부 파일 저장소", "sublabel": "files/sha256/<2>/<sha>", "pos": [1300, 170], "size": [190, 64],
+      "sources": [{ "path": "src/rcompass/services/files.py", "line": 63, "end_line": 73, "label": "blob_path" }] },
+    { "id": "db", "type": "database", "label": "SQLite", "sublabel": "rcompass.db (WAL)", "tag": "BEGIN IMMEDIATE", "pos": [1300, 300], "size": [190, 194],
+      "sources": [
+        { "path": "src/rcompass/db.py", "line": 21, "end_line": 51, "label": "엔진과 트랜잭션" },
+        { "path": "src/rcompass/db.py", "line": 131, "end_line": 146, "label": "추가만 가능 트리거" }
+      ] },
+    { "id": "backups", "type": "database", "label": "백업 zip", "sublabel": "backups/*.zip", "pos": [1300, 560], "size": [190, 64],
+      "sources": [{ "path": "src/rcompass/services/backup.py", "line": 242, "end_line": 257, "label": "이름 예약" }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "rcompass 앱 · 127.0.0.1 전용", "wraps": ["guard", "web", "cli", "filesvc", "domain", "handoff", "backup"] },
+    { "kind": "region", "label": "데이터 디렉터리 (저장소 밖)", "wraps": ["blobs", "db", "backups"] }
+  ],
+  "connections": [
+    { "id": "researcher-guard", "from": "researcher", "to": "guard", "label": "HTTP 127.0.0.1", "variant": "emphasis" },
+    { "id": "guard-web", "from": "guard", "to": "web", "label": "검사 통과", "variant": "emphasis" },
+    { "id": "web-domain", "from": "web", "to": "domain", "label": "기록·판정", "variant": "emphasis" },
+    { "id": "web-handoff", "from": "web", "to": "handoff", "label": "인계·결과 붙여넣기" },
+    { "id": "web-filesvc", "from": "web", "to": "filesvc", "label": "첨부·지문 계산" },
+    { "id": "web-backup", "from": "web", "to": "backup", "label": "지금 백업" },
+    { "id": "handoff-domain", "from": "handoff", "to": "domain", "label": "확인 후 기록" },
+    { "id": "domain-db", "from": "domain", "to": "db", "label": "SQL · BEGIN IMMEDIATE", "variant": "emphasis" },
+    { "id": "handoff-db", "from": "handoff", "to": "db", "label": "인계용 읽기" },
+    { "id": "filesvc-blobs", "from": "filesvc", "to": "blobs", "label": "sha256 주소 저장" },
+    { "id": "filesvc-extdata", "from": "filesvc", "to": "extdata", "label": "읽기 전용 해시", "variant": "dashed" },
+    { "id": "backup-db", "from": "backup", "to": "db", "label": "스냅샷·복구 교체", "fromSide": "top", "toSide": "bottom" },
+    { "id": "backup-blobs", "from": "backup", "to": "blobs", "label": "참조 파일만 묶기", "fromSide": "bottom", "toSide": "right", "via": [[1030, 680], [1550, 680], [1550, 202]] },
+    { "id": "backup-backups", "from": "backup", "to": "backups", "label": "zip 쓰기·검증" },
+    { "id": "cli-web", "from": "cli", "to": "web", "label": "serve (uvicorn)" },
+    { "id": "cli-backup", "from": "cli", "to": "backup", "label": "backup·restore" },
+    { "id": "cli-handoff", "from": "cli", "to": "handoff", "label": "handoff" },
+    { "id": "researcher-cli", "from": "researcher", "to": "cli", "label": "명령 실행" },
+    { "id": "handoff-paste", "from": "researcher", "to": "claude", "label": "인계 Markdown", "variant": "dashed" },
+    { "id": "result-block", "from": "claude", "to": "researcher", "label": "rcompass-result 블록", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "코드 근거", "items": [
+      "커밋 b23aadc(9단계 완료)에 고정했습니다. 노드의 SRC는 그 커밋의 파일과 줄을 가리킵니다.",
+      "10단계 구조도 등록(sandbox iframe)은 이 커밋 뒤의 변경이라 그림에 없습니다.",
+      "migrate와 init --example도 CLI에서 같은 DB와 서비스를 씁니다."
+    ] },
+    { "dot": "emerald", "title": "요청 경로", "items": [
+      "LocalOnly 미들웨어가 Host(127.0.0.1·localhost)와 상태를 바꾸는 요청의 Origin을 먼저 검사합니다.",
+      "모든 트랜잭션은 BEGIN IMMEDIATE로 시작하고, 커밋은 라우트가 합니다.",
+      "결정·기준선처럼 추가만 가능한 표는 DB 트리거가 UPDATE와 DELETE를 막습니다."
+    ] },
+    { "dot": "violet", "title": "자료와 백업", "items": [
+      "첨부 파일은 DB를 건드리기 전에 sha256 주소로 저장합니다.",
+      "외부 데이터는 사용자가 지문 계산을 누를 때만 읽기 전용으로 해시합니다.",
+      "백업 zip에는 DB 스냅샷과 기록이 가리키는 첨부만 들어가고, 복구는 명령줄에서만 합니다."
+    ] },
+    { "dot": "amber", "title": "Claude Code 인계", "items": [
+      "앱과 Claude Code는 직접 연결되지 않습니다. 연구자가 인계 Markdown과 결과 블록을 옮깁니다.",
+      "결과 블록 미리보기는 DB에 쓰지 않고, 확인하고 기록할 때만 실행 결과로 저장합니다."
+    ] }
+  ]
+}

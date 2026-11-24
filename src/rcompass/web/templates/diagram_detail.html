@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ diagram.short_id }} {{ diagram.title }} · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% block content %}
+<h1><span class="id">{{ diagram.short_id }}</span> {{ diagram.title }}</h1>
+<p>
+  <span class="chip chip-basis-{{ diagram.basis.value }}">{{ basis_labels[diagram.basis] }}</span>
+  <span class="tag">{{ kind_labels[diagram.kind] }}</span>
+  {% if diagram.commit_sha %}<span class="muted">커밋 <code title="{{ diagram.commit_sha }}">{{ diagram.commit_sha[:12] }}</code></span>{% endif %}
+  <span class="muted">· 등록 {{ diagram.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+</p>
+{% if freshness %}
+<p class="{{ 'warning' if freshness.stale else 'notice' }}" role="status">{{ freshness.message }}</p>
+{% endif %}
+{% if diagram.basis.value == 'planned' %}
+<p class="hint">계획 단계 예상 구조입니다. 실제 코드를 읽고 만든 그림이 아니므로 코드와 다를 수 있습니다.</p>
+{% endif %}
+
+{% if diagram.explanation_ko %}
+<section class="card">
+  <h2>이 그림에서 볼 것</h2>
+  <p class="explanation">{{ diagram.explanation_ko }}</p>
+</section>
+{% endif %}
+
+<section class="card">
+  <div class="section-head">
+    <h2>구조도</h2>
+    {% if available %}<a href="/projects/{{ project.id }}/diagrams/{{ diagram.short_id }}/view" target="_blank" rel="noopener noreferrer">새 탭에서 크게 보기</a>{% endif %}
+  </div>
+  {% if available %}
+  <iframe class="diagram-frame" src="/projects/{{ project.id }}/diagrams/{{ diagram.short_id }}/view"
+          sandbox="{{ sandbox_flags }}" referrerpolicy="no-referrer" loading="lazy"
+          title="{{ diagram.title }} 구조도"></iframe>
+  <p class="hint">구조도는 앱과 분리된 격리 영역에서 열립니다. 그림 안의 스크립트는 앱의 기록을 읽거나 바꿀 수 없습니다.</p>
+  {% else %}
+  <p class="warning">저장된 구조도 파일이 없습니다. 백업에서 복구하세요.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>근거</h2>
+  <dl class="facts">
+    <dt>저장소</dt>
+    <dd>{% if repo_href %}<a href="{{ repo_href }}" target="_blank" rel="noopener noreferrer"><code class="wrap">{{ diagram.repo_url }}</code></a>{% elif diagram.repo_url %}<code class="wrap">{{ diagram.repo_url }}</code>{% else %}<span class="muted">기록 없음</span>{% endif %}</dd>
+    <dt>커밋</dt>
+    <dd>{% if diagram.commit_sha %}<code class="wrap">{{ diagram.commit_sha }}</code>{% else %}<span class="muted">기록 없음</span>{% endif %}</dd>
+    <dt>관련 파일</dt>
+    <dd>
+      {% if paths %}
+      <ul class="file-list">
+        {% for path, link in paths %}<li>{% if link %}<a href="{{ link }}" target="_blank" rel="noopener noreferrer"><code class="wrap">{{ path }}</code></a>{% else %}<code class="wrap">{{ path }}</code>{% endif %}</li>{% endfor %}
+      </ul>
+      {% else %}<span class="muted">기록 없음</span>{% endif %}
+    </dd>
+    <dt>파일</dt>
+    <dd>
+      {% if html_file %}<a href="/projects/{{ project.id }}/files/{{ html_file.short_id }}"><span class="id">{{ html_file.short_id }}</span> {{ html_file.original_name }}</a> <span class="muted">({{ size }})</span>{% endif %}
+      {% if ir_file %}<br><a href="/projects/{{ project.id }}/files/{{ ir_file.short_id }}"><span class="id">{{ ir_file.short_id }}</span> {{ ir_file.original_name }}</a> <span class="muted">JSON IR</span>{% endif %}
+    </dd>
+    {% if problem or experiment or baseline_link %}
+    <dt>연결</dt>
+    <dd>
+      {% if problem %}<a href="/projects/{{ project.id }}/problems/{{ problem.short_id }}"><span class="id">{{ problem.short_id }}</span> {{ problem.title }}</a><br>{% endif %}
+      {% if experiment %}<a href="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}"><span class="id">{{ experiment.short_id }}</span> {{ experiment.title }}</a><br>{% endif %}
+      {% if baseline_link %}기준선 <span class="id">{{ baseline_link.short_id }}</span> {{ baseline_link.label }}{% endif %}
+    </dd>
+    {% endif %}
+  </dl>
+</section>
+{% endblock %}

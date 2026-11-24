@@ -365,3 +365,17 @@ ol.baseline-history li { padding: 0.15rem 0; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 tr.highlight td { background: var(--met-bg); }
 pre.command { overflow-x: auto; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+
+/* 구조도 */
+.chip-basis-planned { background: var(--insufficient-bg); color: var(--insufficient); }
+.chip-basis-code_backed { background: var(--met-bg); color: var(--met); }
+.chip-stale { background: var(--warn-bg); color: var(--warn); }
+.diagram-frame {
+  display: block; width: 100%; height: min(80vh, 900px); min-height: 420px;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+}
+.explanation { white-space: pre-line; margin: 0; }
+dl.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.4rem 1rem; margin: 0; }
+dl.facts dt { color: var(--muted); font-size: 0.9rem; }
+dl.facts dd { margin: 0; }
+@media (max-width: 640px) { dl.facts { grid-template-columns: minmax(0, 1fr); } dl.facts dd { margin-bottom: 0.5rem; } }

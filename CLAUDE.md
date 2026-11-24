@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 9단계(백업, 복구, 예제, 업데이트)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 10단계(구조도 등록과 Archify)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -89,6 +89,11 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - 복구는 명령줄에서만 합니다. 웹 화면(`/backups`)은 백업 만들기·목록·내려받기만 하고 zip 업로드를 받지 않습니다.
   - `migrate`는 이전 스키마 DB를 올리기 전에 자동 백업하고, 백업에 실패하면 올리지 않습니다.
   - 예제 프로젝트는 [example/](src/rcompass/example/)의 `seed_example`이 서비스 계층으로 만듭니다(7절 시나리오 1~4).
+- **구조도**([services/diagrams.py](src/rcompass/services/diagrams.py), [web/routes/diagrams.py](src/rcompass/web/routes/diagrams.py)):
+  - 올린 HTML은 iframe `sandbox`(`allow-same-origin` 없음)와 응답 CSP `sandbox`로 두 번 격리합니다. 두 권한 목록은 `SANDBOX_FLAGS` 하나로 맞추고, `allow-same-origin`·`allow-forms`·`allow-top-navigation`을 더하지 마세요. 같은 출처가 되면 그림의 스크립트가 Origin 검사를 통과해 기록을 바꿀 수 있습니다.
+  - 일반 첨부 파일 내려주기(`/files/{id}/content`)는 그대로 HTML을 `attachment`로만 보냅니다. HTML을 화면에 보여주는 곳은 `/diagrams/{id}/view` 하나뿐입니다.
+  - 코드 근거 구조도는 전체 커밋 SHA와 관련 파일이 필수이고, 비운 칸은 JSON IR의 `meta.repository`와 `sources`로 채웁니다. 업로드는 첨부 파일과 같이 DB 전에 `store_stream`으로 저장합니다.
+  - 오래됨 배지는 앱에 기록된 값(기준선 실험의 `code_ref`, 기준선 변경 시각)만으로 계산합니다. Git을 읽지 않습니다.
 - **프로젝트 홈**([services/dashboard.py](src/rcompass/services/dashboard.py)):
   - 목표 달성(현재 기준선 스냅샷의 판정)과 작업 진행(판정을 마친 실험 수, 해결한 문제 수)은 따로 계산하고 화면에서도 나눠 보여줍니다.
   - "최근 시도"는 지표를 마지막으로 기록한 시도 실험(E0 제외)입니다. 값을 다시 기록하면 `record_results`가 결과 행을 지우고 새로 만들어, `MetricResult.id` 순서가 기록 순서가 되게 합니다.
