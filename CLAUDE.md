@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 5단계(파일 첨부, 자료 열람, 계보)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 6단계(결정과 기준선 전이)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -61,9 +61,16 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - 요청 크기는 `BodySizeLimitMiddleware`(순수 ASGI)가 받는 바이트를 세어 넘으면 `HTTPException(413)`을 던집니다. chunked 요청도 이렇게 막습니다.
   - 지문 계산은 로컬·NAS 절대 경로와 `file://`(UNC 포함)만 대상으로 합니다. 상대 경로는 서버의 현재 폴더(소스 저장소일 수 있음)를 기준으로 엉뚱한 파일을 읽을 수 있어 계산하지 않습니다. 원본은 읽기만 합니다.
 - **짧은 ID**([ids.py](src/rcompass/ids.py)): 모두 1부터 발급합니다. `E0`(기준선 측정 실험)과 `B0`은 프로젝트를 만들 때 `BASELINE_MEASUREMENT_ID`와 `BASELINE_ZERO_ID`로 직접 붙입니다. 실행 ID는 `scope=f"R:{experiment_id}"`로 실험마다 R1부터 시작합니다.
+- **결정과 기준선**([services/decisions.py](src/rcompass/services/decisions.py)):
+  - `Decision`과 `BaselineChange`는 추가만 가능하고, 수정하거나 삭제하는 API를 만들지 않습니다. 판단을 뒤집을 때는 철회(새 결정)를 추가합니다.
+  - 채택하면 새 기준선을 만들고, 그때 집계에 든 실행(제외하지 않았고 수치가 있는 실행)을 `BaselineRun` 스냅샷으로 고정합니다. 채택 뒤 실행을 추가하거나 제외해도 기준선 수치는 바뀌지 않습니다.
+  - `Project.current_baseline_id`는 캐시입니다. 기준선을 옮길 때는 같은 트랜잭션에서 `BaselineChange`를 추가해, 마지막 변경의 `to_baseline_id`와 항상 같게 둡니다.
+  - 내릴 수 있는 결정은 `allowed_decisions`가 정합니다. 결정 전과 보류 상태에서는 채택·기각(보류는 한 번), 채택 상태에서는 철회만 됩니다. 기각과 철회는 마지막 판단입니다.
+  - 채택은 `adoption_gate`(데이터 버전, 코드 버전, 설정, 측정한 기준마다 `min_runs`)를 통과해야 합니다. 기각과 보류는 빠진 기록을 경고만 합니다.
+  - 철회의 기본 복귀 대상은 철회되지 않은 가장 가까운 조상입니다. 철회하는 기준선이 현재 기준선이 아니면 복귀 대상을 직접 고르게 합니다.
+  - 판정한 실험은 가설과 판정 기준을, 채택했던 실험은 입력을 고칠 수 없습니다(`PLAN_LOCKED`, `INPUTS_LOCKED`).
+  - 판정 폼에는 맨 앞에 비활성 제출 버튼을 둡니다. Enter 키로 되돌릴 수 없는 판정이 제출되는 것을 막기 위해서입니다.
 - 이후 단계에서 지킬 도메인 규칙(계획서 4절):
-  - `Decision`과 `BaselineChange`는 추가만 가능하고, 수정하거나 삭제하는 API를 만들지 않습니다.
-  - 채택하면 `Baseline.run_ids`에 실행 스냅샷을 고정합니다. 채택 뒤 실행을 추가하거나 제외해도 기준선 수치는 바뀌지 않습니다.
   - 성공 기준 상태는 `미측정`, `근거 부족`(`min_runs` 미달), `미달`, `달성` 네 가지이고, 작업 진행률과 목표 달성은 따로 계산합니다.
   - 앱은 연구 저장소의 Git이나 원본 파일을 절대 쓰지 않습니다. 원본을 읽는 것은 사용자가 누른 "지문 계산"(읽기 전용 해시)뿐입니다. 커밋 SHA는 텍스트로만 다룹니다.
 - 외부 LLM API 없이 동작해야 합니다. LLM 연동은 선택 기능으로만 추가합니다.

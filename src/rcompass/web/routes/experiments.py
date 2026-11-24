@@ -1,4 +1,4 @@
-"""실험 만들기, 실험 상세, 가설 수정, 입력, 결과 붙여넣기, 실행 제외."""
+"""실험 만들기, 실험 상세, 가설 수정, 입력, 결과 붙여넣기, 실행 제외, 판정(채택·기각·보류·철회)."""
 
 from __future__ import annotations
 
@@ -10,10 +10,23 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from rcompass.models import Baseline, Experiment, ExperimentKind, FileKind, Problem, Project
+from rcompass.models import Baseline, DecisionType, Experiment, ExperimentKind, FileKind, Problem, Project
 from rcompass.services import ValidationError
 from rcompass.services.datasets import list_versions
+from rcompass.services.decisions import (
+    DECISION_LABELS,
+    adoption_gate,
+    allowed_decisions,
+    decide,
+    decision_history,
+    excluded_snapshot_runs,
+    judgment,
+    revoke_adoption,
+    revoke_plan,
+)
 from rcompass.services.experiments import (
+    INPUTS_LOCKED,
+    PLAN_LOCKED,
     create_experiment,
     get_experiment,
     input_versions,
@@ -40,6 +53,7 @@ from rcompass.services.runs import (
     parse_results_table,
     record_results,
 )
+from rcompass.web.charts import strip_chart
 from rcompass.web.context import Crumb, project_context
 from rcompass.web.deps import get_session
 from rcompass.web.templating import templates
@@ -79,6 +93,28 @@ def _default_table_header(session: Session, project: Project) -> str:
     return "\t".join(["label", *keys])
 
 
+def _decision_context(session: Session, project: Project, experiment: Experiment) -> dict:
+    if experiment.kind is not ExperimentKind.TRIAL:
+        return {}
+    comparisons = judgment(session, project, experiment)
+    history = decision_history(session, experiment)
+    # 철회한 채택의 기준선은 이미 쓰지 않으므로 '철회를 검토하라'는 경고를 띄우지 않습니다.
+    snapshot_warnings = [w for row in history if row.baseline and not row.revoked_by
+                         for w in excluded_snapshot_runs(session, row.baseline)]
+    problem = session.get(Problem, experiment.problem_id) if experiment.problem_id else None
+    return {
+        "allowed": allowed_decisions(experiment),
+        "gate": adoption_gate(session, project, experiment),
+        "comparisons": [(c, strip_chart(c, f"이 실험 {experiment.short_id}")) for c in comparisons],
+        "history": history,
+        "revoke": revoke_plan(session, project, experiment),
+        "snapshot_warnings": snapshot_warnings,
+        "decision_labels": DECISION_LABELS,
+        "decision_types": DecisionType,
+        "owner_problem": problem,
+    }
+
+
 def _render_detail(request: Request, session: Session, project: Project, experiment: Experiment, *,
                    errors: dict | None = None, values: dict | None = None, status_code: int = 200) -> HTMLResponse:
     context = _experiment_context(session, project, experiment)
@@ -98,6 +134,8 @@ def _render_detail(request: Request, session: Session, project: Project, experim
             "versions": list_versions(session, project.id),
             # 저장 실패로 다시 보여줄 때는 사용자가 고른 체크 상태를 유지합니다.
             "checked_ids": (values or {}).get("input_ids", {str(v.version.id) for v in inputs}),
+            "inputs_locked": experiment.outcome in INPUTS_LOCKED,
+            "plan_locked": experiment.outcome in PLAN_LOCKED,
             "inputs": inputs,
             "errors": errors or {},
             "values": values or {},
@@ -108,6 +146,7 @@ def _render_detail(request: Request, session: Session, project: Project, experim
             "format_size": format_size,
             "notice": {"snapshot": params.get("snapshot"), "warn": params.get("warn"),
                        "saved": params.get("saved")},
+            **_decision_context(session, project, experiment),
         },
         status_code=status_code,
     )
@@ -311,3 +350,52 @@ def upload_file_route(
                               values={"caption": caption, "kind": kind, "run": run}, status_code=422)
     session.commit()
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=file#files", status_code=303)
+
+
+# ---------------------------------------------------------------- 판정
+
+
+@router.post("/experiments/{short_id}/decisions")
+def decide_route(
+    request: Request, project_id: int, short_id: str, session: SessionDep,
+    type: FormText = "", reason: FormText = "", baseline_label: FormText = "", revisit_condition: FormText = "",
+) -> Response:
+    """채택, 기각, 보류. 채택은 재현성 관문을 통과해야 하고, 새 기준선을 만들어 현재 기준선을 옮깁니다."""
+    project = _project_or_404(session, project_id)
+    experiment = _experiment_or_404(session, project, short_id)
+    try:
+        decision_type = DecisionType(type)
+        if decision_type is DecisionType.REVOKE:
+            raise ValueError(type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="판정 종류가 올바르지 않습니다.") from None
+    try:
+        decide(session, project, experiment, decision_type, reason=reason, baseline_label=baseline_label,
+               revisit_condition=revisit_condition)
+    except ValidationError as error:
+        session.rollback()
+        values = {"type": type, "reason": reason, "baseline_label": baseline_label,
+                  "revisit_condition": revisit_condition}
+        return _render_detail(request, session, project, experiment, errors=error.errors, values=values,
+                              status_code=422)
+    session.commit()
+    return RedirectResponse(f"{experiment_url(project, experiment)}?saved=decision#decision", status_code=303)
+
+
+@router.post("/experiments/{short_id}/revoke")
+def revoke_route(
+    request: Request, project_id: int, short_id: str, session: SessionDep,
+    reason: FormText = "", target: FormText = "",
+) -> Response:
+    """채택 철회. 원래 결정과 기준선은 남기고, 현재 기준선만 복귀 대상으로 옮깁니다."""
+    project = _project_or_404(session, project_id)
+    experiment = _experiment_or_404(session, project, short_id)
+    try:
+        revoke_adoption(session, project, experiment, reason=reason, target_short_id=target)
+    except ValidationError as error:
+        session.rollback()
+        values = {"revoke_reason": reason, "revoke_target": target}
+        return _render_detail(request, session, project, experiment, errors=error.errors, values=values,
+                              status_code=422)
+    session.commit()
+    return RedirectResponse(f"{experiment_url(project, experiment)}?saved=revoke#decision", status_code=303)

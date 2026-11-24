@@ -18,6 +18,10 @@
   --insufficient-bg: #fefce8;
   --unmeasured: #57534e;
   --unmeasured-bg: #f5f5f4;
+  /* 판정 패널 점 그림: 기준선(파랑)과 이 실험(주황). validate_palette.js로 두 화면 모두 확인 */
+  --series-base: #2a78d6;
+  --series-trial: #eb6834;
+  --grid: #e7e5e4;
   color-scheme: light dark;
 }
 
@@ -42,6 +46,9 @@
     --insufficient-bg: #33300f;
     --unmeasured: #d6d3d1;
     --unmeasured-bg: #3a3633;
+    --series-base: #3987e5;
+    --series-trial: #d95926;
+    --grid: #3a3633;
   }
 }
 
@@ -287,3 +294,51 @@ td .badge { margin-left: 0; }
 .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .two-col .card { margin-bottom: 0; }
 @media (max-width: 640px) { .two-col { grid-template-columns: minmax(0, 1fr); } }
+
+/* 판정 패널 */
+.chip-outcome-adopted { background: var(--met-bg); color: var(--met); }
+.chip-outcome-rejected { background: var(--not-met-bg); color: var(--not-met); }
+.chip-outcome-held { background: var(--insufficient-bg); color: var(--insufficient); }
+.chip-outcome-revoked { background: var(--warn-bg); color: var(--warn); }
+.rule-box { border-left: 4px solid var(--border); padding: 0.25rem 0.75rem; margin-bottom: 0.75rem; }
+.rule-box h3 { margin-top: 0; font-size: 0.85rem; color: var(--muted); }
+.rule-box .lead { margin: 0; }
+.comparison { border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.75rem; }
+.comparison h3 { margin-top: 0.25rem; }
+.compare-line { margin: 0.25rem 0; font-variant-numeric: tabular-nums; }
+.delta { font-weight: 600; margin-left: 0.25rem; }
+.strip { margin: 0.25rem 0 0.5rem; max-width: 640px; overflow-x: auto; }
+/* 좁은 화면에서 글자가 읽을 수 없게 작아지지 않도록 최소 너비를 두고 가로로 스크롤합니다. */
+.strip-chart { width: 100%; min-width: 460px; height: auto; display: block; }
+.strip-chart text { font-size: 12px; fill: var(--muted); font-family: inherit; }
+.strip-chart .lane-name { fill: var(--text); font-weight: 600; }
+.strip-chart .grid { stroke: var(--grid); stroke-width: 1; }
+.strip-chart .target { stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.strip-chart .target-label { fill: var(--text); }
+.strip-chart .range { stroke-width: 6; stroke-linecap: round; opacity: 0.22; }
+.strip-chart .range-base { stroke: var(--series-base); }
+.strip-chart .range-trial { stroke: var(--series-trial); }
+.strip-chart .agg { stroke: var(--text); stroke-width: 2; stroke-linecap: round; }
+.strip-chart .dot { stroke: var(--surface); stroke-width: 2; }
+.strip-chart .dot-base { fill: var(--series-base); }
+.strip-chart .dot-trial { fill: var(--series-trial); }
+.strip-chart .hit { fill: transparent; }
+.strip-chart .dot-group:hover .dot { stroke: var(--text); }
+.strip figcaption { margin-top: 0.15rem; }
+.decision-form { border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 1rem; }
+.decision-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; }
+.decision-option { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem 0.75rem; display: grid; gap: 0.4rem; align-content: start; }
+.decision-option h3 { margin: 0; }
+.decision-option .button { justify-self: start; }
+.gate { background: var(--insufficient-bg); border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.9rem; }
+.gate p { margin: 0; }
+.gate ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
+.button.danger { border-color: var(--danger); color: var(--danger); justify-self: start; }
+.next-try { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.5rem; }
+ol.history { list-style: none; padding: 0; margin: 0; }
+ol.history li { border-left: 3px solid var(--border); padding: 0.25rem 0 0.25rem 0.75rem; margin: 0.4rem 0; }
+ol.history li.history-adopt { border-left-color: var(--met); }
+ol.history li.history-reject { border-left-color: var(--not-met); }
+ol.history li.history-hold { border-left-color: var(--insufficient); }
+ol.history li.history-revoke { border-left-color: var(--warn); }
+ol.history p { margin: 0.1rem 0; }

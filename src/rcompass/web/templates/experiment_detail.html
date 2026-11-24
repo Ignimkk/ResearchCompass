@@ -5,10 +5,13 @@
 {% block content %}
 <div class="page-head">
   <h1><span class="id">{{ experiment.short_id }}</span> {{ experiment.title }}</h1>
-  <span class="chip {% if experiment.status.value == 'done' %}chip-active{% endif %}">{{ '결과 있음' if experiment.status.value == 'done' else '계획' }}</span>
+  {% if experiment.outcome %}<span class="chip chip-outcome-{{ experiment.outcome.value }}">{{ outcome_symbols[experiment.outcome][0] }} {{ outcome_symbols[experiment.outcome][1] }}</span>
+  {% else %}<span class="chip {% if experiment.status.value == 'done' %}chip-active{% endif %}">{{ '결과 있음' if experiment.status.value == 'done' else '계획' }}</span>{% endif %}
 </div>
 
 {% if notice.saved == 'results' %}<p class="notice" role="status">결과를 기록했습니다.{% if notice.snapshot %} 새 실행을 기준선 {{ notice.snapshot }}의 근거에 더했습니다.{% endif %}</p>{% endif %}
+{% if notice.saved == 'decision' %}<p class="notice" role="status">판정을 기록했습니다. 앱 기록만 바뀌었고, 연구 저장소의 Git과 파일은 그대로입니다.</p>{% endif %}
+{% if notice.saved == 'revoke' %}<p class="notice" role="status">채택을 철회했습니다. 현재 기준선은 {{ baseline.short_id }} {{ baseline.label }}입니다. 원래 채택 결정과 기준선 기록은 남아 있습니다.</p>{% endif %}
 {% if notice.saved in ('plan', 'inputs', 'exclude', 'file') %}<p class="notice" role="status">저장했습니다.</p>{% endif %}
 {% if notice.warn %}<p class="warning" role="status">{{ notice.warn }}</p>{% endif %}
 
@@ -24,13 +27,19 @@
   <section class="card"><h2>판정 기준</h2><p class="lead">{{ experiment.decision_rule }}</p></section>
 </div>
 <details class="card later" {% if values.get('plan_open') %}open{% endif %}>
-  <summary>제목·가설·판정 기준 고치기{% if revisions %} (변경 이력 {{ revisions|length }}건){% endif %}</summary>
+  <summary>{% if plan_locked %}제목 고치기{% else %}제목·가설·판정 기준 고치기{% endif %}{% if revisions %} (변경 이력 {{ revisions|length }}건){% endif %}</summary>
+  {% if plan_locked %}<p class="hint">판정을 마친 실험이라 가설과 판정 기준은 고칠 수 없습니다. 다른 가설은 새 실험으로 기록하세요.</p>{% endif %}
   <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/plan" class="stack">
     {% if errors.get('confirm') %}<p class="warning" role="alert">{{ errors['confirm'] }}</p>{% endif %}
     <label>제목 <input name="title" value="{{ values.get('title', experiment.title) }}"></label>{{ err('title') }}
+    {% if plan_locked %}
+    <input type="hidden" name="hypothesis" value="{{ experiment.hypothesis }}">
+    <input type="hidden" name="decision_rule" value="{{ experiment.decision_rule }}">
+    {% else %}
     <label>가설 <textarea name="hypothesis" rows="2">{{ values.get('hypothesis', experiment.hypothesis) }}</textarea></label>{{ err('hypothesis') }}
     <label>판정 기준 <textarea name="decision_rule" rows="2">{{ values.get('decision_rule', experiment.decision_rule) }}</textarea></label>{{ err('decision_rule') }}
-    {% if results.rows %}<label class="checkbox"><input type="checkbox" name="confirm" value="1"> 결과를 본 뒤 바꾸는 것임을 확인합니다(변경 이력에 남습니다)</label>{% endif %}
+    {% endif %}
+    {% if results.rows and not plan_locked %}<label class="checkbox"><input type="checkbox" name="confirm" value="1"> 결과를 본 뒤 바꾸는 것임을 확인합니다(변경 이력에 남습니다)</label>{% endif %}
     <button type="submit" class="button">저장</button>
   </form>
   {% if revisions %}
@@ -46,9 +55,17 @@
 {% endif %}
 
 {# 2. 입력 #}
-<section class="card">
+<section class="card" id="inputs">
   <h2>입력</h2>
   {% if start_baseline %}<p class="muted">출발 기준선: <span class="id">{{ start_baseline.short_id }}</span> {{ start_baseline.label }}</p>{% endif %}
+  {% if inputs_locked %}
+  <p class="hint">채택했던 실험의 입력은 기준선의 재현 기록이라 고칠 수 없습니다.</p>
+  <dl class="meta">
+    <dt>데이터 버전</dt><dd>{% for v in inputs %}{{ v.label }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</dd>
+    <dt>코드 버전</dt><dd><code class="wrap">{{ experiment.code_ref or '—' }}</code></dd>
+    <dt>설정</dt><dd><pre class="mono">{{ experiment.config_text or '—' }}</pre></dd>
+  </dl>
+  {% else %}
   <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/inputs" class="stack">
     <fieldset class="plain">
       <legend>데이터 버전</legend>
@@ -71,6 +88,7 @@
     </label>
     <button type="submit" class="button">입력 저장</button>
   </form>
+  {% endif %}
 </section>
 
 {# 3. 실행과 결과 #}
@@ -162,10 +180,5 @@
   </details>
 </section>
 
-{% if not is_baseline_measurement %}
-<section class="card">
-  <h2>판정</h2>
-  <p class="muted">채택·기각·보류 판정은 다음 단계에서 추가됩니다.</p>
-</section>
-{% endif %}
+{% if not is_baseline_measurement %}{% include "_judgment_panel.html" %}{% endif %}
 {% endblock %}

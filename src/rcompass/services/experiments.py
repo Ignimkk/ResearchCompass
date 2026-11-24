@@ -9,6 +9,7 @@ from rcompass.ids import next_short_id
 from rcompass.models import (
     Experiment,
     ExperimentKind,
+    ExperimentOutcome,
     ExperimentRevision,
     MetricResult,
     Problem,
@@ -21,6 +22,10 @@ from rcompass.services.datasets import VersionView, get_version
 from rcompass.services.problems import get_problem
 
 TRACKED_FIELDS = ("hypothesis", "decision_rule")  # 결과를 본 뒤 바뀌면 판정이 흔들리는 항목
+# 판정을 마친 실험(보류 제외)은 가설과 판정 기준을 고치지 않습니다. 판정의 근거가 바뀌기 때문입니다.
+PLAN_LOCKED = {ExperimentOutcome.ADOPTED, ExperimentOutcome.REJECTED, ExperimentOutcome.REVOKED}
+# 채택한 실험의 입력(데이터, 코드, 설정)은 기준선의 재현 기록입니다.
+INPUTS_LOCKED = {ExperimentOutcome.ADOPTED, ExperimentOutcome.REVOKED}
 
 
 def _clean(text: str | None) -> str | None:
@@ -104,7 +109,9 @@ def update_plan(
     if not new_values["decision_rule"]:
         errors["decision_rule"] = "판정 기준은 비울 수 없습니다."
     changed = [f for f in TRACKED_FIELDS if new_values[f] != getattr(experiment, f)]
-    if changed and not confirm_after_results and has_results(session, experiment):
+    if changed and experiment.outcome in PLAN_LOCKED:
+        errors["confirm"] = "판정한 뒤에는 가설과 판정 기준을 고칠 수 없습니다. 다른 가설은 새 실험으로 기록하세요."
+    elif changed and not confirm_after_results and has_results(session, experiment):
         errors["confirm"] = "이미 결과가 있습니다. 결과를 본 뒤 가설이나 판정 기준을 바꾸는 것이 맞는지 확인란에 체크하세요."
     if errors:
         raise ValidationError(errors)
@@ -137,6 +144,8 @@ def update_inputs(
     config_text: str | None,
 ) -> None:
     """입력 데이터 버전, 코드 버전(커밋 SHA 또는 메모), 설정을 저장합니다."""
+    if experiment.outcome in INPUTS_LOCKED:
+        raise ValidationError({"inputs": "채택했던 실험의 입력은 기준선의 재현 기록이라 고칠 수 없습니다."})
     versions = [get_version(session, experiment.project_id, vid) for vid in dataset_version_ids]
     if any(v is None for v in versions):
         raise ValidationError({"inputs": "선택한 데이터 버전을 찾을 수 없습니다."})

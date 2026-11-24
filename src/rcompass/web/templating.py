@@ -8,7 +8,8 @@ from fastapi.templating import Jinja2Templates
 
 from rcompass import __version__
 from rcompass.models import Aggregate, Direction
-from rcompass.services.aggregate import format_plain
+from rcompass.services.aggregate import format_aggregated, format_plain
+from rcompass.services.problems import OUTCOME_SYMBOLS
 
 WEB_DIR = Path(__file__).parent
 
@@ -22,6 +23,8 @@ templates.env.globals.update(
     version=__version__,
     DIRECTION_LABELS=DIRECTION_LABELS,
     AGGREGATE_LABELS=AGGREGATE_LABELS,
+    outcome_symbols=OUTCOME_SYMBOLS,
+    format_agg=format_aggregated,
 )
 templates.env.filters.update(
     direction_symbol=lambda direction: DIRECTION_SYMBOLS[direction],

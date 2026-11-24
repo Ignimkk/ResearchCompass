@@ -49,34 +49,44 @@ class CriterionEvaluation:
         return format_aggregated(self.aggregated, self.criterion.aggregate)
 
 
-def baseline_values(session: Session, baseline_id: int, criterion: SuccessCriterion) -> list[float]:
-    """기준선 스냅샷 실행에서 이 기준의 지표 값을 실행마다 하나씩 모읍니다."""
+def criterion_run_values(session: Session, run_ids, criterion: SuccessCriterion) -> dict[int, float]:
+    """실행마다 이 기준의 지표 값 하나(같은 실행에 여러 번 기록했다면 마지막 기록).
+
+    ``run_ids``는 id 목록이나 id를 고르는 select입니다. 기준에 평가 데이터 버전이 있으면 그 버전으로 잰 값만 셉니다.
+    """
     query = (
         select(MetricResult.run_id, MetricResult.value)
-        .join(BaselineRun, BaselineRun.run_id == MetricResult.run_id)
-        .where(BaselineRun.baseline_id == baseline_id, MetricResult.metric_key == criterion.metric_key)
+        .where(MetricResult.run_id.in_(run_ids), MetricResult.metric_key == criterion.metric_key)
         .order_by(MetricResult.run_id, MetricResult.id)
     )
     if criterion.eval_dataset_version_id is not None:
         query = query.where(MetricResult.dataset_version_id == criterion.eval_dataset_version_id)
     per_run: dict[int, float] = {}
     for run_id, value in session.execute(query):
-        per_run[run_id] = value  # 같은 실행에 여러 번 기록했다면 마지막 기록을 씁니다.
-    return list(per_run.values())
+        per_run[run_id] = value
+    return per_run
+
+
+def baseline_values(session: Session, baseline_id: int, criterion: SuccessCriterion) -> list[float]:
+    """기준선 스냅샷 실행에서 이 기준의 지표 값을 실행마다 하나씩 모읍니다."""
+    snapshot = select(BaselineRun.run_id).where(BaselineRun.baseline_id == baseline_id)
+    return list(criterion_run_values(session, snapshot, criterion).values())
+
+
+def state_of(agg: Aggregated | None, criterion: SuccessCriterion) -> CriterionState:
+    if agg is None:
+        return CriterionState.UNMEASURED
+    if agg.n < criterion.min_runs:
+        return CriterionState.INSUFFICIENT
+    if meets_target(agg.value, criterion.target, criterion.direction):
+        return CriterionState.MET
+    return CriterionState.NOT_MET
 
 
 def evaluate(session: Session, criterion: SuccessCriterion, baseline: Baseline | None) -> CriterionEvaluation:
     values = baseline_values(session, baseline.id, criterion) if baseline else []
     agg = aggregate(values, criterion.aggregate, criterion.direction)
-    if agg is None:
-        state = CriterionState.UNMEASURED
-    elif agg.n < criterion.min_runs:
-        state = CriterionState.INSUFFICIENT
-    elif meets_target(agg.value, criterion.target, criterion.direction):
-        state = CriterionState.MET
-    else:
-        state = CriterionState.NOT_MET
-    return CriterionEvaluation(criterion=criterion, baseline=baseline, aggregated=agg, state=state)
+    return CriterionEvaluation(criterion=criterion, baseline=baseline, aggregated=agg, state=state_of(agg, criterion))
 
 
 def evaluate_project(session: Session, project: Project) -> list[CriterionEvaluation]:

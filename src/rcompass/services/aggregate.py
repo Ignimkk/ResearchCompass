@@ -48,7 +48,7 @@ def meets_target(value: float, target: float, direction: Direction) -> bool:
 MAX_DECIMALS = 6
 
 
-def _decimals(values: tuple[float, ...]) -> int:
+def decimals_of(values: tuple[float, ...]) -> int:
     """입력값에 쓰인 소수 자릿수(최대 6). 0.0004도 0으로 뭉개지지 않게 6자리까지 봅니다."""
     places = 0
     for value in values:
@@ -70,7 +70,7 @@ def format_number(value: float, decimals: int = 0) -> str:
 
 def format_aggregated(agg: Aggregated, method: Aggregate = Aggregate.MEAN) -> str:
     """예: 실행 1개 ``18``, 여러 개 평균 ``18.0 ± 1.0 (n=3)``, 중앙값 ``18.0 (중앙값, n=3)``."""
-    base = _decimals(agg.values)
+    base = decimals_of(agg.values)
     if agg.n == 1:
         return format_number(agg.value, base)
     places = max(1, base)

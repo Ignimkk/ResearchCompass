@@ -226,7 +226,13 @@ def test_new_e0_runs_extend_b0_snapshot_and_change_state(session: Session, proje
 
 
 def test_e0_runs_do_not_touch_b0_when_not_current(session: Session, project: Project, trial: Experiment) -> None:
-    project.current_baseline_id = None  # (6단계 전) 현재 기준선이 B0이 아닌 상황을 흉내
+    from rcompass.models import DecisionType
+    from rcompass.services.decisions import decide
+
+    version = add_dataset_version(session, project, dataset_name="eval", version_label="v1", external_uri="D:/e").version
+    update_inputs(session, trial, dataset_version_ids=[version.id], code_ref="a1b2c3d", config_text="c.yaml")
+    record_results(session, project, trial, parse_results_table("label\twrong_count\na\t11\nb\t12\nc\t10"))
+    decide(session, project, trial, DecisionType.ADOPT, reason="목표 달성")  # 현재 기준선이 B1로 옮겨 감
     e0 = _e0_by_id(session, project)
     outcome = record_results(session, project, e0, parse_results_table("label\twrong_count\nseed=4\t18"))
     assert outcome.snapshot_baseline is None and "현재 기준선이 아니어서" in outcome.warnings[0]

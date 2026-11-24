@@ -1,0 +1,145 @@
+{# 판정 패널: 판정 기준과 기준선 대비 차이, 실행별 점, 채택·기각·보류·철회, 결정 이력 (계획서 3절 화면 3의 4~6) #}
+{% macro strip(chart, method) -%}
+<figure class="strip">
+  <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" class="strip-chart" role="img" aria-label="{{ chart.summary }}">
+    {% for t in chart.ticks %}
+    <line class="grid" x1="{{ t.x }}" x2="{{ t.x }}" y1="16" y2="{{ chart.axis_y - 6 }}"></line>
+    <text class="tick" x="{{ t.x }}" y="{{ chart.axis_y + 12 }}" text-anchor="middle">{{ t.label }}</text>
+    {% endfor %}
+    {% set anchor = 'start' if chart.target_x < chart.left + 40 else ('end' if chart.target_x > chart.right_edge - 40 else 'middle') %}
+    <line class="target" x1="{{ chart.target_x }}" x2="{{ chart.target_x }}" y1="16" y2="{{ chart.axis_y - 6 }}"></line>
+    <text class="target-label" x="{{ chart.target_x }}" y="11" text-anchor="{{ anchor }}">{{ chart.target_label }}</text>
+    {% for lane in chart.lanes %}
+    <text class="lane-name" x="{{ chart.left - 12 }}" y="{{ lane.y + 4 }}" text-anchor="end">{{ lane.name }}</text>
+    {% if lane.range_x %}<line class="range range-{{ lane.css }}" x1="{{ lane.range_x[0] }}" x2="{{ lane.range_x[1] }}" y1="{{ lane.y }}" y2="{{ lane.y }}"></line>{% endif %}
+    {% if lane.agg_x is not none %}<line class="agg" x1="{{ lane.agg_x }}" x2="{{ lane.agg_x }}" y1="{{ lane.y - 12 }}" y2="{{ lane.y + 12 }}"></line>{% endif %}
+    {% for d in lane.dots %}
+    <g class="dot-group"><title>{{ d.title }}</title>
+      <circle class="hit" cx="{{ d.x }}" cy="{{ d.y }}" r="10"></circle>
+      <circle class="dot dot-{{ lane.css }}" cx="{{ d.x }}" cy="{{ d.y }}" r="5"></circle></g>
+    {% endfor %}
+    {% endfor %}
+  </svg>
+  <figcaption class="hint">점: 실행 하나 · 세로 막대: 대표값({{ AGGREGATE_LABELS[method] }}) · 옅은 선: 최소~최대 · 점선: 목표. 점에 마우스를 올리면 실행 이름과 값이 보입니다.</figcaption>
+</figure>
+{%- endmacro %}
+
+<section class="card" id="decision">
+  <h2>판정</h2>
+  <div class="rule-box">
+    <h3>판정 기준 (실험 전에 적은 것)</h3>
+    <p class="lead">{{ experiment.decision_rule }}</p>
+  </div>
+
+  {% if comparisons and comparisons[0][0].replaced_start %}{% set rs = comparisons[0][0].replaced_start %}
+  <p class="warning" role="note">출발 기준선 {{ rs.short_id }} {{ rs.label }}은(는) 채택이 철회되었습니다. 그래서 현재 기준선{% if comparisons[0][0].baseline %} {{ comparisons[0][0].baseline.short_id }}{% endif %}과 비교합니다.</p>
+  {% endif %}
+  {% for c, chart in comparisons %}
+  <div class="comparison">
+    <h3><span class="id">{{ c.criterion.short_id }}</span> {{ c.criterion.name }}
+      <span class="muted">· 목표 {{ c.criterion.direction|direction_symbol }} {{ c.criterion.target|target }}{% if c.criterion.unit %} {{ c.criterion.unit }}{% endif %} · {{ AGGREGATE_LABELS[c.criterion.aggregate] }}{% if c.criterion.min_runs > 1 %} · 실행 {{ c.criterion.min_runs }}개 이상{% endif %}</span></h3>
+    <p class="compare-line">
+      {% if c.baseline %}기준선 <span class="id">{{ c.baseline.short_id }}</span> <strong>{{ c.base and format_agg(c.base, c.criterion.aggregate) or '미측정' }}</strong> → {% endif %}이 실험 <strong>{{ c.trial and format_agg(c.trial, c.criterion.aggregate) or '미측정' }}</strong>
+      {% if c.delta_display %}<span class="delta">{{ c.delta_display }}</span>{% endif %}
+      <span class="badge state-{{ c.state.value }}">{{ c.state_label }}{% if c.state.value == 'insufficient' %} (실행 {{ c.trial.n }}/{{ c.criterion.min_runs }}){% endif %}</span>
+    </p>
+    {% if c.overlaps %}<p class="warning" role="note">차이가 실행 간 변동 안에 있습니다. 두 쪽의 최소~최대 범위가 겹칩니다.</p>{% endif %}
+    {% if c.criterion.eval_dataset_version_id %}<p class="hint">이 기준은 지정한 평가 데이터 버전으로 잰 값만 셉니다.</p>{% endif %}
+    {% if chart %}{{ strip(chart, c.criterion.aggregate) }}{% endif %}
+  </div>
+  {% else %}
+  <p class="muted">아직 성공 기준과 비교할 결과가 없습니다. 실행과 결과를 먼저 기록하세요.</p>
+  {% endfor %}
+
+  {% for w in snapshot_warnings %}<p class="warning" role="note">{{ w }}</p>{% endfor %}
+  {% if errors.get('decision') %}<p class="field-error" role="alert" id="decision-error">{{ errors['decision'] }}</p>{% endif %}
+
+  {% if decision_types.ADOPT in allowed or decision_types.REJECT in allowed %}
+  <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/decisions" class="stack decision-form">
+    {# 입력란에서 Enter를 누르면 브라우저가 폼의 첫 제출 버튼을 누른 것으로 칩니다. 되돌릴 수 없는 판정이
+       실수로 기록되지 않도록, 첫 버튼을 비활성 버튼으로 두어 Enter로는 제출되지 않게 합니다. #}
+    <button type="submit" disabled hidden aria-hidden="true" tabindex="-1" class="enter-guard"></button>
+    {% if experiment.outcome and experiment.outcome.value == 'held' %}<p class="hint">보류한 실험입니다. 다시 판정할 수 있습니다.</p>{% endif %}
+    <label>이유 한 줄 <span class="req">필수</span>
+      <input name="reason" value="{{ values.get('reason', '') }}" placeholder="예: 평균 오답 +1, 형식 오류 2건 증가"
+        {% if errors.get('reason') %}aria-invalid="true" aria-describedby="reason-error"{% endif %}></label>
+    {% if errors.get('reason') %}<p class="field-error" id="reason-error">{{ errors['reason'] }}</p>{% endif %}
+
+    <div class="decision-actions">
+      <div class="decision-option">
+        <h3>채택</h3>
+        {% if gate.ok %}
+        <label>새 기준선 이름 <input name="baseline_label" value="{{ values.get('baseline_label', experiment.title) }}"></label>
+        {% for w in gate.warnings %}<p class="hint">{{ w }}</p>{% endfor %}
+        <p class="hint">지금 집계에 든 실행 {{ results.included_count }}개가 새 기준선의 근거로 고정됩니다.</p>
+        <button type="submit" name="type" value="adopt" class="button primary">채택</button>
+        {% else %}
+        <div class="gate" role="note">
+          <p><strong>빠진 항목 채우기</strong> · 채택하려면 먼저 채우세요.</p>
+          <ul>{% for item in gate.missing %}<li><a href="#{{ item.anchor }}">{{ item.label }}</a></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+      <div class="decision-option">
+        <h3>기각</h3>
+        <p class="hint">현재 기준선은 그대로입니다.</p>
+        <button type="submit" name="type" value="reject" class="button">기각</button>
+      </div>
+      {% if decision_types.HOLD in allowed %}
+      <div class="decision-option">
+        <h3>보류</h3>
+        <label>재개 조건 (선택) <input name="revisit_condition" value="{{ values.get('revisit_condition', '') }}" placeholder="예: 평가셋 v2가 나오면"></label>
+        <button type="submit" name="type" value="hold" class="button">보류</button>
+      </div>
+      {% endif %}
+    </div>
+    {% if gate.record_gaps %}<p class="hint">재현 기록이 빠져 있습니다({{ gate.record_gaps|map(attribute='label')|join(', ') }}). 기각과 보류는 그대로 저장되지만, 나중에 채워 두면 좋습니다.</p>{% endif %}
+    <p class="hint">판정은 앱 기록만 바꿉니다. 연구 저장소의 Git과 파일은 건드리지 않습니다. 결정은 고치거나 지울 수 없습니다.</p>
+  </form>
+  {% endif %}
+
+  {% if revoke %}
+  <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/revoke" class="stack decision-form">
+    <h3>채택 철회</h3>
+    <p>이 실험의 채택(<span class="id">{{ revoke.adoption.short_id }}</span>)으로 만든 기준선 <span class="id">{{ revoke.baseline.short_id }}</span> {{ revoke.baseline.label }}을(를) 더 이상 쓰지 않을 때 철회합니다. 채택 결정과 기준선 기록은 남습니다.</p>
+    {% if revoke.warning %}<p class="warning" role="note">{{ revoke.warning }}</p>{% endif %}
+    <label>철회 이유 <span class="req">필수</span>
+      <input name="reason" value="{{ values.get('revoke_reason', '') }}" placeholder="예: 평가셋 일부가 예시에 섞임"
+        {% if errors.get('revoke_reason') %}aria-invalid="true" aria-describedby="revoke_reason-error"{% endif %}></label>
+    {% if errors.get('revoke_reason') %}<p class="field-error" id="revoke_reason-error">{{ errors['revoke_reason'] }}</p>{% endif %}
+    <label>철회한 뒤 현재 기준선
+      <select name="target" {% if errors.get('revoke_target') %}aria-invalid="true" aria-describedby="revoke_target-error"{% endif %}>
+        {% if not revoke.default %}<option value="">고르세요</option>{% endif %}
+        {% set chosen = values.get('revoke_target') or (revoke.default.short_id if revoke.default else '') %}
+        {% for b in revoke.targets %}<option value="{{ b.short_id }}" {% if b.short_id == chosen %}selected{% endif %}>{{ b.short_id }} {{ b.label }}{% if b.id == revoke.current.id %} (지금 현재 기준선, 유지){% elif revoke.default and b.id == revoke.default.id %} (이전 기준선){% endif %}</option>{% endfor %}
+      </select></label>
+    {% if errors.get('revoke_target') %}<p class="field-error" id="revoke_target-error">{{ errors['revoke_target'] }}</p>{% endif %}
+    <p class="hint">앱 기록만 바뀝니다. 연구 저장소의 Git과 파일은 그대로입니다.</p>
+    <button type="submit" class="button danger">채택 철회</button>
+  </form>
+  {% endif %}
+
+  {% if experiment.outcome %}
+  <div class="next-try">
+    {% if owner_problem %}<a class="button" href="/projects/{{ project.id }}/problems/{{ owner_problem.short_id }}/experiments/new">{{ owner_problem.short_id }} {{ owner_problem.title }}에서 다음 시도</a>{% endif %}
+    {% if baseline %}<a class="button" href="/projects/{{ project.id }}/problems">기준선 {{ baseline.short_id }}에서 다른 문제 고르기</a>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if history %}
+  <h3>결정 이력</h3>
+  <ol class="history">
+    {% for row in history %}
+    <li class="history-{{ row.decision.type.value }}">
+      <span class="id">{{ row.decision.short_id }}</span> <strong>{{ row.label }}</strong>
+      <span class="muted">{{ row.decision.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+      {% if row.revoked_by %}<span class="chip">철회됨 ({{ row.revoked_by.short_id }})</span>{% endif %}
+      <p>{{ row.decision.reason }}</p>
+      {% if row.decision.revisit_condition %}<p class="muted">재개 조건: {{ row.decision.revisit_condition }}</p>{% endif %}
+      {% if row.baseline %}<p class="muted">새 기준선 <span class="id">{{ row.baseline.short_id }}</span> "{{ row.baseline.label }}"{% if row.moved_from %} (이전 {{ row.moved_from.short_id }}){% endif %}</p>
+      {% elif row.moved_to %}<p class="muted">현재 기준선 {{ row.moved_from.short_id }} → {{ row.moved_to.short_id }} {{ row.moved_to.label }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>
