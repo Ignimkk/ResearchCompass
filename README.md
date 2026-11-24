@@ -9,6 +9,7 @@
 ```bash
 git clone <이 저장소 URL> rcompass && cd rcompass
 uv sync
+uv run rcompass init --example   # 예제 프로젝트 "QA 평가 오답 줄이기" (생략 가능)
 uv run rcompass serve
 ```
 
@@ -31,6 +32,18 @@ DB와 첨부 파일은 **저장소 밖**에 저장되므로 Git에 올라가지 
 | 1 | `--data-dir` 옵션 | `uv run rcompass serve --data-dir D:/research-data` |
 | 2 | `RCOMPASS_DATA_DIR` 환경변수 | |
 | 3 | 기본 사용자 데이터 경로 | Windows `%LOCALAPPDATA%\rcompass`, macOS `~/Library/Application Support/rcompass`, Linux `~/.local/share/rcompass` |
+
+## 백업, 복구, 업데이트
+
+```bash
+uv run rcompass backup                         # <데이터 디렉터리>/backups/rcompass-backup-YYYYMMDD-HHMM.zip
+uv run rcompass restore <zip> --data-dir <빈 폴더>   # 서버를 끈 상태에서
+git pull && uv sync && uv run rcompass migrate # 업데이트: migrate가 먼저 자동 백업합니다
+```
+
+- 백업 zip에는 DB와 첨부 파일이 들어갑니다. 웹 화면의 "백업"에서도 만들고 내려받을 수 있습니다.
+- 대용량 외부 데이터(로컬·NAS 경로, URL)는 위치와 지문만 기록되고 백업에 들어가지 않습니다. 따로 보관하세요. 복구가 끝나면 외부 참조마다 "접근 가능", "없음", "지문 불일치"를 알려줍니다. NAS 같은 네트워크 경로(UNC)는 직접 만든 백업일 때만 `--check-network`를 붙여 확인하세요.
+- 복구는 레코드 수와 모든 파일의 sha256을 확인한 뒤에만 데이터를 바꿉니다. 이미 기록이 있는 폴더는 거부하고, `--force`를 붙이면 기존 데이터를 먼저 백업한 뒤 바꿉니다.
 
 ## 개발
 

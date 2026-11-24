@@ -7,6 +7,7 @@
   <h1>{{ project.title }}</h1>
   <div class="actions">
     <a class="button" href="/projects/{{ project.id }}/handoff">Claude Code 인계</a>
+    <a class="button" href="/backups">백업</a>
     <a class="button" href="/projects/{{ project.id }}/problems/new{% if focus %}?parent={{ focus.short_id }}{% endif %}">새 하위 문제</a>
     {% if focus %}<a class="button primary" href="/projects/{{ project.id }}/problems/{{ focus.short_id }}/experiments/new">새 실험</a>
     {% else %}<a class="button primary" href="/projects/{{ project.id }}/problems">문제를 골라 새 실험</a>{% endif %}

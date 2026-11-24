@@ -23,6 +23,15 @@ def test_redirected_cp1252_stream_switches_to_utf8() -> None:
     assert raw.getvalue().decode("utf-8") == "데이터 디렉터리"
 
 
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows NUL 장치의 isatty 동작")
+def test_nul_device_switches_to_utf8() -> None:
+    # Windows에서 `> NUL`(Git Bash의 `> /dev/null`)은 isatty()가 True인 cp1252 스트림입니다.
+    with open("NUL", "w", encoding="cp1252") as stream:
+        assert stream.isatty()
+        ensure_utf8_output(stream)
+        stream.write("데이터 디렉터리")
+
 @pytest.mark.parametrize(
     ("args", "expected"),
     [

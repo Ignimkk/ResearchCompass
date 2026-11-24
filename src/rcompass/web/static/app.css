@@ -360,3 +360,8 @@ ol.baseline-history li { padding: 0.15rem 0; }
 .handoff-text { width: 100%; font-size: 0.85rem; line-height: 1.5; margin-bottom: 1rem; white-space: pre-wrap; }
 .status-line { min-height: 1.5em; margin: 0.25rem 0; color: var(--met); font-size: 0.9rem; }
 .actions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+/* 백업 */
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.highlight td { background: var(--met-bg); }
+pre.command { overflow-x: auto; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }

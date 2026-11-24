@@ -67,7 +67,7 @@ def blob_rel_path(digest: str) -> str:
 def blob_path(data_dir: Path, rel_path: str) -> Path:
     """DB에 적힌 상대 경로를 실제 경로로 바꿉니다. 저장소 밖을 가리키면 거부합니다."""
     parts = rel_path.split("/")
-    if (len(parts) != 4 or "/".join(parts[:2]) != BLOB_PREFIX or not SHA256_RE.match(parts[3])
+    if (len(parts) != 4 or "/".join(parts[:2]) != BLOB_PREFIX or not SHA256_RE.fullmatch(parts[3])
             or parts[2] != parts[3][:2]):
         raise ValueError("첨부 파일 경로가 올바르지 않습니다.")
     return data_dir.joinpath(*parts)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 8단계(Claude Code 인계와 결과 블록)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 9단계(백업, 복구, 예제, 업데이트)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -13,7 +13,10 @@ UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다
 ```bash
 uv sync                                   # 의존성 설치 (.venv 생성)
 uv run rcompass serve --data-dir <폴더>    # http://127.0.0.1:8765 (빈 DB는 시작 시 자동 생성)
-uv run rcompass migrate --data-dir <폴더>  # 기존 DB를 최신 스키마로
+uv run rcompass migrate --data-dir <폴더>  # 기존 DB를 최신 스키마로 (먼저 자동 백업)
+uv run rcompass init --example --data-dir <폴더>   # 빈 DB + 예제 프로젝트
+uv run rcompass backup --data-dir <폴더>   # <폴더>/backups/rcompass-backup-YYYYMMDD-HHMM.zip
+uv run rcompass restore <zip> --data-dir <빈 폴더>  # 기록이 있으면 거부, --force면 먼저 백업 후 교체
 uv run pytest                             # 전체 테스트
 uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스트
 ```
@@ -77,13 +80,22 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - 결과 블록은 PyYAML `compose`로 노드만 읽고 값은 글자 그대로 다룹니다(형 변환 없음, 오류마다 붙여넣은 텍스트 기준 줄 번호). 별칭(&, *)은 거부합니다.
   - 미리보기 라우트는 DB에 쓰지 않습니다. 기록은 "확인하고 기록"(`confirm_results`)에서만 하고 provenance는 `claude_confirmed`입니다.
   - 템플릿에 넣는 값은 `yaml_value`로 필요할 때 따옴표로 감쌉니다. 그대로 넣을 수 없는 값(여러 줄, 너무 긴 값)은 `<...>` 안내 문구로 두고, 안내 문구는 빈 값으로 읽습니다. 값을 줄여 넣으면 다른 값으로 기록되기 때문입니다.
+- **백업과 복구**([services/backup.py](src/rcompass/services/backup.py)):
+  - zip에는 `manifest.json`, `db.sqlite`(`VACUUM INTO` 스냅샷), 기록이 가리키는 `files/sha256/...`만 넣습니다. 외부 참조는 manifest 목록으로만 남깁니다.
+  - 백업·복구는 ORM 대신 SQL로 스냅샷을 읽습니다. 이전 스키마 DB(업데이트 전 자동 백업, 이전 버전 백업 복구)도 같은 코드로 다루기 위해서입니다.
+  - 복구는 `extractall`을 쓰지 않습니다. zip 항목 이름은 manifest와 정확히 같아야 하고(중복·추가 항목 거부), 파일 경로는 sha256으로 만든 경로여야 합니다. manifest 크기를 넘으면 바로 멈추고 sha256과 레코드 수를 확인합니다.
+  - 검증은 데이터 디렉터리 안 `.restore-*` 임시 폴더에서 끝낸 뒤 `_swap_in`으로 바꿉니다. 옮기다 실패하면(Windows에서 서버가 DB를 잡고 있을 때) 원래대로 되돌립니다.
+  - 복구 후 외부 참조 점검은 네트워크 경로(UNC, `file://host`)에 기본으로 접근하지 않습니다(`--check-network`일 때만). 조작된 manifest로 NTLM 인증이 새는 것을 막기 위해서입니다.
+  - 복구는 명령줄에서만 합니다. 웹 화면(`/backups`)은 백업 만들기·목록·내려받기만 하고 zip 업로드를 받지 않습니다.
+  - `migrate`는 이전 스키마 DB를 올리기 전에 자동 백업하고, 백업에 실패하면 올리지 않습니다.
+  - 예제 프로젝트는 [example/](src/rcompass/example/)의 `seed_example`이 서비스 계층으로 만듭니다(7절 시나리오 1~4).
 - **프로젝트 홈**([services/dashboard.py](src/rcompass/services/dashboard.py)):
   - 목표 달성(현재 기준선 스냅샷의 판정)과 작업 진행(판정을 마친 실험 수, 해결한 문제 수)은 따로 계산하고 화면에서도 나눠 보여줍니다.
   - "최근 시도"는 지표를 마지막으로 기록한 시도 실험(E0 제외)입니다. 값을 다시 기록하면 `record_results`가 결과 행을 지우고 새로 만들어, `MetricResult.id` 순서가 기록 순서가 되게 합니다.
   - 다음 행동은 한 줄(`one_line`)이고 `MAX_NEXT_ACTION`자까지입니다. 프로젝트 생성과 홈 수정에 같은 규칙을 씁니다.
 - 이후 단계에서 지킬 도메인 규칙(계획서 4절):
   - 성공 기준 상태는 `미측정`, `근거 부족`(`min_runs` 미달), `미달`, `달성` 네 가지이고, 작업 진행률과 목표 달성은 따로 계산합니다.
-  - 앱은 연구 저장소의 Git이나 원본 파일을 절대 쓰지 않습니다. 원본을 읽는 것은 사용자가 누른 "지문 계산"(읽기 전용 해시)뿐입니다. 커밋 SHA는 텍스트로만 다룹니다.
+  - 앱은 연구 저장소의 Git이나 원본 파일을 절대 쓰지 않습니다. 원본을 읽는 것은 사용자가 누른 "지문 계산"과 `restore`의 외부 참조 점검(읽기 전용 해시)뿐입니다. 커밋 SHA는 텍스트로만 다룹니다.
 - 외부 LLM API 없이 동작해야 합니다. LLM 연동은 선택 기능으로만 추가합니다.
 
 ## 단계 완료 기준

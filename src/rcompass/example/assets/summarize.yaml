@@ -1,0 +1,10 @@
+# E2 문단 요약 후 답변 (예제 설정)
+model: qa-small-v3
+prompt: prompts/answer_v1.txt
+summarize:
+  enabled: true
+  chunk_chars: 800
+  max_summary_tokens: 120
+eval:
+  dataset: eval-100 v1.0
+  seeds: [1, 2, 3]
