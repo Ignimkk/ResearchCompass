@@ -3,19 +3,34 @@
 {% block context %}{% include "_context_bar.html" %}{% endblock %}
 {% macro err(name) %}{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
 {% block content %}
-<h1>자료 · 데이터 버전</h1>
+<h1>자료</h1>
+{% if verify_message %}<p class="{{ 'warning' if verify_mismatch else 'notice' }}" role="status">{{ verify_message }}</p>{% endif %}
+
 <section class="card">
+  <h2>데이터 버전 {{ versions|length }}개</h2>
   {% if versions %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th scope="col">데이터셋 · 버전</th><th scope="col">출처</th><th scope="col">수집일</th><th scope="col">위치</th></tr></thead>
+      <thead><tr><th scope="col">데이터셋 · 버전</th><th scope="col">출처 · 수집일</th><th scope="col">위치 · 지문</th><th scope="col">사용한 실험</th></tr></thead>
       <tbody>
         {% for v in versions %}
-        <tr>
+        <tr id="version-{{ v.version.id }}">
           <td><span class="id">{{ v.dataset.short_id }}</span> {{ v.dataset.name }} <strong>{{ v.version.version_label }}</strong></td>
-          <td>{{ v.version.source or '—' }}</td>
-          <td>{{ v.version.collected_at or '—' }}</td>
-          <td><code class="wrap">{{ v.version.external_uri }}</code>{% if v.version.sha256 %}<br><span class="muted">sha256 {{ v.version.sha256[:12] }}…</span>{% endif %}<br><span class="muted">외부 참조 · 백업에 포함되지 않음</span></td>
+          <td>{{ v.version.source or '출처 미기록' }}<br><span class="muted">{{ v.version.collected_at or '수집일 미기록' }}</span></td>
+          <td>
+            {% if v.version.storage.value == 'attached' %}
+              첨부 파일 <span class="muted">· 백업에 포함</span>
+            {% else %}
+              <code class="wrap">{{ v.version.external_uri }}</code><br><span class="muted">외부 참조 · 백업에 포함되지 않음</span>
+            {% endif %}
+            <br><span class="muted">{% if v.version.sha256 %}sha256 <code>{{ v.version.sha256[:12] }}…</code>{% else %}지문 없음{% endif %}{% if v.version.last_verified_at %} · 확인 {{ v.version.last_verified_at.strftime('%Y-%m-%d') }}{% endif %}</span>
+            {% if v.version.storage.value == 'external' %}
+            <form method="post" action="/projects/{{ project.id }}/datasets/{{ v.version.id }}/verify" class="inline">
+              <button type="submit" class="button small">{{ '지문 대조' if v.version.sha256 else '지문 계산' }}</button>
+            </form>
+            {% endif %}
+          </td>
+          <td>{% for e in usage.get(v.version.id, []) %}<a href="/projects/{{ project.id }}/experiments/{{ e.short_id }}">{{ e.short_id }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -27,10 +42,33 @@
 </section>
 
 <section class="card">
+  <h2>첨부 파일 {{ files|length }}개</h2>
+  {% if files %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">파일</th><th scope="col">종류</th><th scope="col">만든 실험</th><th scope="col">크기</th></tr></thead>
+      <tbody>
+        {% for f in files %}
+        <tr>
+          <td><a href="/projects/{{ project.id }}/files/{{ f.short_id }}"><span class="id">{{ f.short_id }}</span> {{ f.original_name }}</a>{% if f.caption %}<br><span class="muted">{{ f.caption }}</span>{% endif %}</td>
+          <td>{{ kind_labels[f.kind] }}</td>
+          <td>{% if f.produced_by_experiment_id %}{% set e = experiments[f.produced_by_experiment_id] %}<a href="/projects/{{ project.id }}/experiments/{{ e.short_id }}">{{ e.short_id }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{{ format_size(f.size_bytes) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">첨부한 파일이 없습니다. 실험 화면에서 결과 그래프나 표를 첨부하세요.</p>
+  {% endif %}
+</section>
+
+<section class="card" id="register">
   <h2>데이터 버전 등록</h2>
-  <p class="hint">대용량 데이터는 복사하지 않고 위치만 기록합니다. 같은 데이터셋 이름이면 새 버전으로 추가됩니다.</p>
+  <p class="hint">대용량 데이터는 복사하지 않고 위치만 기록합니다(백업 제외). 작은 데이터는 파일로 첨부하면 백업에 포함됩니다. 같은 데이터셋 이름이면 새 버전으로 추가됩니다.</p>
   {% if errors %}<div class="error-summary" role="alert"><p><strong>입력을 확인해 주세요.</strong></p></div>{% endif %}
-  <form method="post" action="/projects/{{ project.id }}/datasets" class="stack">
+  <form method="post" action="/projects/{{ project.id }}/datasets" enctype="multipart/form-data" class="stack">
     <input type="hidden" name="back" value="{{ back }}">
     <div class="grid">
       <label class="span-2">데이터셋 이름 <span class="req">필수</span>
@@ -41,12 +79,15 @@
         <input name="collected_at" type="date" value="{{ values.get('collected_at', '') }}"></label>
     </div>
     {{ err('dataset_name') }}{{ err('version_label') }}{{ err('collected_at') }}
-    <label>위치 (로컬·NAS 경로 또는 URL) <span class="req">필수</span>
+    <label>위치 (로컬·NAS 경로 또는 URL)
       <input name="external_uri" value="{{ values.get('external_uri', '') }}" placeholder="예: D:/data/eval100_v1.jsonl" spellcheck="false"></label>
     {{ err('external_uri') }}
+    <label>또는 작은 파일 첨부
+      <input name="attachment" type="file"></label>
+    {{ err('attachment') }}
     <label>출처
       <input name="source" value="{{ values.get('source', '') }}" placeholder="예: 내부 QA 수집"></label>
-    <label>sha256 (선택)
+    <label>sha256 (외부 참조일 때, 선택 · 비워 두면 '지문 계산'으로 기록)
       <input name="sha256" value="{{ values.get('sha256', '') }}" spellcheck="false" class="mono"></label>
     {{ err('sha256') }}
     <label>메모

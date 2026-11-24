@@ -9,7 +9,7 @@
 </div>
 
 {% if notice.saved == 'results' %}<p class="notice" role="status">결과를 기록했습니다.{% if notice.snapshot %} 새 실행을 기준선 {{ notice.snapshot }}의 근거에 더했습니다.{% endif %}</p>{% endif %}
-{% if notice.saved in ('plan', 'inputs', 'exclude') %}<p class="notice" role="status">저장했습니다.</p>{% endif %}
+{% if notice.saved in ('plan', 'inputs', 'exclude', 'file') %}<p class="notice" role="status">저장했습니다.</p>{% endif %}
 {% if notice.warn %}<p class="warning" role="status">{{ notice.warn }}</p>{% endif %}
 
 {# 1. 가설과 판정 기준 #}
@@ -126,6 +126,38 @@
       </label>
       {% endif %}
       <button type="submit" class="button primary">결과 기록</button>
+    </form>
+  </details>
+</section>
+
+{# 4. 파일 #}
+<section class="card" id="files">
+  <h2>파일 {{ files|length }}개</h2>
+  {% if files %}
+  <ul class="file-list">
+    {% for f in files %}
+    <li><a href="/projects/{{ project.id }}/files/{{ f.short_id }}"><span class="id">{{ f.short_id }}</span> {{ f.original_name }}</a>
+      <span class="chip">{{ kind_labels[f.kind] }}</span> <span class="muted">{{ format_size(f.size_bytes) }}{% if f.caption %} · {{ f.caption }}{% endif %}</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <details class="later" {% if errors.get('upload') or not files %}open{% endif %}>
+    <summary>결과 그래프·표·설정 첨부</summary>
+    <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/files" enctype="multipart/form-data" class="stack">
+      <p class="hint">작은 파일은 데이터 디렉터리에 복사되어 백업에 포함됩니다. 이 실험의 입력 데이터 버전이 파일의 출처로 함께 기록됩니다.</p>
+      <label>파일 <input type="file" name="upload" {% if errors.get('upload') %}aria-invalid="true" aria-describedby="upload-error"{% endif %}></label>
+      {% if errors.get('upload') %}<p class="field-error" id="upload-error">{{ errors['upload'] }}</p>{% endif %}
+      <div class="grid">
+        <label>종류
+          <select name="kind">{% for k in upload_kinds %}<option value="{{ k.value }}" {% if values.get('kind', 'figure') == k.value %}selected{% endif %}>{{ kind_labels[k] }}</option>{% endfor %}</select>
+        </label>
+        <label>만든 실행 (선택)
+          <select name="run"><option value="">실험 전체</option>{% for row in results.rows %}<option value="{{ row.run.short_id }}" {% if values.get('run') == row.run.short_id %}selected{% endif %}>{{ row.run.short_id }} {{ row.run.label }}</option>{% endfor %}</select>
+        </label>
+        <label class="span-2">설명
+          <input name="caption" value="{{ values.get('caption', '') }}" placeholder="예: 오답 유형별 개수"></label>
+      </div>
+      <button type="submit" class="button">첨부</button>
     </form>
   </details>
 </section>

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ record.short_id }} {{ record.original_name }} · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% set content_url = "/projects/" ~ project.id ~ "/files/" ~ record.short_id ~ "/content" %}
+{% block content %}
+<div class="page-head">
+  <h1><span class="id">{{ record.short_id }}</span> {{ record.original_name }}</h1>
+  {% if not missing %}<a class="button" href="{{ content_url }}">{{ '열기' if preview_kind != 'none' else '내려받기' }}</a>{% endif %}
+</div>
+<p class="muted">{{ kind_labels[record.kind] }} · {{ size }} · sha256 <code>{{ (record.sha256 or '')[:12] }}…</code>{% if record.caption %} · {{ record.caption }}{% endif %}</p>
+
+{% if missing %}
+<p class="warning" role="alert">저장된 파일이 없습니다. 데이터 디렉터리의 files 폴더가 지워졌거나 백업에서 빠졌을 수 있습니다. 백업에서 복구하세요. 아래 계보 기록은 남아 있습니다.</p>
+{% endif %}
+{% if preview_kind == 'image' %}
+<section class="card preview"><img src="{{ content_url }}" alt="{{ record.caption or record.original_name }}"></section>
+{% elif preview_kind == 'text' and preview %}
+<section class="card preview"><pre class="mono">{{ preview[0] }}</pre>{% if preview[1] %}<p class="muted">앞부분만 보여줍니다.</p>{% endif %}</section>
+{% endif %}
+
+<section class="card lineage">
+  <h2>계보: 이 파일은 어디서 왔나</h2>
+  <ul class="chain">
+    <li><strong>{{ record.short_id }} {{ record.original_name }}</strong> <span class="muted">(첨부, sha256 {{ (record.sha256 or '')[:8] }}…)</span>
+      {% if lineage.run %}
+      <ul><li>생성 실행: <span class="id">{{ lineage.experiment.short_id }}/{{ lineage.run.short_id }}</span> {{ lineage.run.label }}
+      {% endif %}
+      {% if lineage.experiment %}{% set e = lineage.experiment %}
+        <ul><li>실험: <a href="/projects/{{ project.id }}/experiments/{{ e.short_id }}"><span class="id">{{ e.short_id }}</span> {{ e.title }}</a>
+          {% if lineage.path %}<span class="muted">(문제 {% for p in lineage.path %}{{ p.short_id }} {{ p.title }}{% if not loop.last %} › {% endif %}{% endfor %}, 이유: "{{ lineage.path[-1].why }}")</span>{% endif %}
+          <ul>
+            {% if e.hypothesis %}<li>가설: {{ e.hypothesis }}</li>{% endif %}
+            {% if e.decision_rule %}<li>판정 기준: {{ e.decision_rule }}</li>{% endif %}
+            {% set versions = lineage.derived_from or lineage.experiment_inputs %}
+            <li>입력 데이터:
+              {% for v in versions %}<span class="id">{{ v.dataset.short_id }}</span> {{ v.dataset.name }} {{ v.version.version_label }}
+                <span class="muted">(출처: {{ v.version.source or '미기록' }}, 수집일 {{ v.version.collected_at or '미기록' }},
+                {% if v.version.storage.value == 'external' %}외부 참조 {{ v.version.external_uri }}{% else %}첨부{% endif %}{% if v.version.sha256 %}, sha256 {{ v.version.sha256[:8] }}…{% endif %})</span>{% if not loop.last %}; {% endif %}
+              {% else %}<span class="warning-text">기록 없음</span>{% endfor %}</li>
+            <li>코드: {% if e.code_ref %}<code>{{ e.code_ref }}</code>{% else %}<span class="warning-text">기록 없음</span>{% endif %}
+              · 설정: {% if e.config_text %}<code>{{ e.config_text|truncate(80) }}</code>{% else %}<span class="warning-text">기록 없음</span>{% endif %}
+              {% for c in lineage.config_files %} · <a href="/projects/{{ project.id }}/files/{{ c.short_id }}">{{ c.short_id }} {{ c.original_name }}</a>{% endfor %}</li>
+            {% if lineage.results and lineage.results.metrics %}
+            <li>결과: {% for m in lineage.results.metrics %}{{ m.key }} = {{ m.display }}{% if not loop.last %}, {% endif %}{% endfor %}</li>
+            {% endif %}
+            <li>결정: {% for d in lineage.decisions %}<span class="id">{{ d.short_id }}</span> {{ {'adopt': '채택', 'reject': '기각', 'hold': '보류', 'revoke': '철회'}[d.type.value] }} ({{ d.created_at.strftime('%Y-%m-%d') }}) {{ d.reason }}{% if not loop.last %}; {% endif %}{% else %}<span class="muted">아직 없음</span>{% endfor %}
+              {% for b in lineage.baselines %} → 기준선 <span class="id">{{ b.short_id }}</span> "{{ b.label }}"{% endfor %}</li>
+          </ul>
+        </li></ul>
+      {% else %}
+        <ul><li class="muted">실험에 연결되지 않은 파일입니다.</li></ul>
+      {% endif %}
+      {% if lineage.run %}</li></ul>{% endif %}
+    </li>
+  </ul>
+</section>
+{% endblock %}

@@ -1,19 +1,18 @@
-"""실험 만들기, 실험 상세, 가설 수정, 입력, 결과 붙여넣기, 실행 제외, 데이터 버전 등록."""
+"""실험 만들기, 실험 상세, 가설 수정, 입력, 결과 붙여넣기, 실행 제외."""
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from rcompass.models import Baseline, Experiment, ExperimentKind, Problem, Project
+from rcompass.models import Baseline, Experiment, ExperimentKind, FileKind, Problem, Project
 from rcompass.services import ValidationError
-from rcompass.services.datasets import add_dataset_version, list_versions
+from rcompass.services.datasets import list_versions
 from rcompass.services.experiments import (
     create_experiment,
     get_experiment,
@@ -21,6 +20,16 @@ from rcompass.services.experiments import (
     revisions,
     update_inputs,
     update_plan,
+)
+from rcompass.services.files import (
+    KIND_LABELS,
+    UPLOAD_KINDS,
+    FileTooLarge,
+    add_file,
+    discard_if_unreferenced,
+    format_size,
+    list_files,
+    store_stream,
 )
 from rcompass.services.problems import get_problem, problem_path
 from rcompass.services.projects import get_criteria, get_project
@@ -93,6 +102,10 @@ def _render_detail(request: Request, session: Session, project: Project, experim
             "errors": errors or {},
             "values": values or {},
             "table_header": _default_table_header(session, project),
+            "files": list_files(session, project.id, experiment=experiment),
+            "kind_labels": KIND_LABELS,
+            "upload_kinds": UPLOAD_KINDS,
+            "format_size": format_size,
             "notice": {"snapshot": params.get("snapshot"), "warn": params.get("warn"),
                        "saved": params.get("saved")},
         },
@@ -249,54 +262,52 @@ def exclude_run_route(
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=exclude#results", status_code=303)
 
 
-# ---------------------------------------------------------------- 데이터 버전
-
-
-def _render_datasets(request: Request, session: Session, project: Project, values: dict, errors: dict,
-                     status_code: int = 200, back: str | None = None) -> HTMLResponse:
-    context = project_context(session, project, tail=[Crumb("자료")], section="materials")
-    return templates.TemplateResponse(
-        request, "datasets.html",
-        {**context, "versions": list_versions(session, project.id), "values": values, "errors": errors,
-         "back": back if back is not None else request.query_params.get("back", "")},
-        status_code=status_code,
-    )
-
-
-@router.get("/datasets", response_class=HTMLResponse)
-def datasets_page(request: Request, project_id: int, session: SessionDep) -> HTMLResponse:
-    return _render_datasets(request, session, _project_or_404(session, project_id), {}, {})
-
-
-@router.post("/datasets")
-def add_dataset_route(
-    request: Request, project_id: int, session: SessionDep,
-    dataset_name: FormText = "", version_label: FormText = "", external_uri: FormText = "",
-    source: FormText = "", collected_at: FormText = "", sha256: FormText = "", notes: FormText = "",
-    back: FormText = "",
+@router.post("/experiments/{short_id}/files")
+def upload_file_route(
+    request: Request, project_id: int, short_id: str, session: SessionDep,
+    upload: Annotated[UploadFile | None, File()] = None,
+    kind: FormText = "figure", caption: FormText = "", run: FormText = "",
 ) -> Response:
-    project = _project_or_404(session, project_id)
-    values = {"dataset_name": dataset_name, "version_label": version_label, "external_uri": external_uri,
-              "source": source, "collected_at": collected_at, "sha256": sha256, "notes": notes}
-    errors: dict[str, str] = {}
-    collected = None
-    if collected_at.strip():
+    """결과 그래프·표·설정·로그를 실험(과 실행)에 첨부합니다. 입력 데이터 버전이 파일의 출처로 연결됩니다."""
+    settings = request.app.state.settings
+    problems: list[str] = []
+    try:
+        file_kind = FileKind(kind)
+    except ValueError:
+        file_kind = FileKind.OTHER
+    has_upload = upload is not None and bool(upload.filename)
+    if not has_upload:
+        problems.append("첨부할 파일을 고르세요.")
+    # 내용은 DB를 건드리기 전에 저장합니다. 복사·해시 계산 동안 DB 쓰기 잠금을 잡지 않기 위해서입니다.
+    blob = None
+    if has_upload:
         try:
-            collected = date.fromisoformat(collected_at.strip())
-        except ValueError:
-            errors["collected_at"] = "수집일은 2026-11-02 형식으로 입력하세요."
-    if not errors:
-        try:
-            add_dataset_version(session, project, dataset_name=dataset_name, version_label=version_label,
-                                external_uri=external_uri, source=source, collected_at=collected,
-                                sha256=sha256, notes=notes)
-        except ValidationError as error:
-            errors = error.errors
-    if errors:
+            blob = store_stream(settings.data_dir, upload.file, settings.max_attachment_bytes)
+        except FileTooLarge as error:
+            problems.append(f"{error} 큰 파일은 자료 화면에서 위치(경로나 URL)로 기록하세요.")
+    try:
+        project = _project_or_404(session, project_id)
+        experiment = _experiment_or_404(session, project, short_id)
+        target_run = get_run(session, experiment, run) if run else None
+        if run and target_run is None:
+            problems.append("선택한 실행을 찾을 수 없습니다.")
+        if blob is not None and not problems:
+            try:
+                add_file(session, project, blob, original_name=upload.filename, kind=file_kind, caption=caption,
+                         experiment=experiment, run=target_run,
+                         derived_from_version_ids=[v.version.id for v in input_versions(session, experiment)])
+            except ValidationError as error:
+                problems.extend(error.errors.values())
+    except BaseException:  # 404 등: 방금 저장한 내용이 고아로 남지 않게 정리
         session.rollback()
-        return _render_datasets(request, session, project, values, errors, status_code=422, back=back)
+        if blob is not None:
+            discard_if_unreferenced(session, settings.data_dir, blob)
+        raise
+    if problems:
+        session.rollback()
+        if blob is not None:
+            discard_if_unreferenced(session, settings.data_dir, blob)
+        return _render_detail(request, session, project, experiment, errors={"upload": " ".join(problems)},
+                              values={"caption": caption, "kind": kind, "run": run}, status_code=422)
     session.commit()
-    # 실험 화면에서 왔으면 그 실험으로 돌아갑니다(내부 경로만 허용).
-    safe = back.startswith(f"/projects/{project.id}/") and "//" not in back and "\\" not in back
-    target = back if safe else f"/projects/{project.id}/datasets"
-    return RedirectResponse(target, status_code=303)
+    return RedirectResponse(f"{experiment_url(project, experiment)}?saved=file#files", status_code=303)

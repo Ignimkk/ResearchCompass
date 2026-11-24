@@ -27,13 +27,21 @@ SOURCE_LABELS: dict[DataDirSource, str] = {
 }
 
 
+DEFAULT_MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024  # 작은 첨부 파일 상한. 더 큰 데이터는 외부 참조로 기록
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path
+    max_attachment_bytes: int = DEFAULT_MAX_ATTACHMENT_BYTES
 
     @property
     def db_path(self) -> Path:
         return self.data_dir / DB_FILENAME
+
+    @property
+    def files_dir(self) -> Path:
+        return self.data_dir / "files"
 
 
 def default_data_dir() -> Path:

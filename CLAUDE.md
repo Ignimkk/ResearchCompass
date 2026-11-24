@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 4단계(실험, 실행, 결과 수치)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 5단계(파일 첨부, 자료 열람, 계보)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -52,12 +52,20 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - 결과는 "실행 × 지표" 표(첫 줄 머리글, 탭·쉼표·공백 구분)로 받습니다. 실행은 실험 안에서 이름으로 찾습니다(이름은 고유 인덱스).
   - 기준선 스냅샷(`BaselineRun`)에 든 실행은 값이든 메타데이터든 다시 쓰지 않습니다.
   - E0에 새 실행을 기록하면, B0이 현재 기준선일 때만 `snapshot_update`로 B0 근거를 넓힙니다.
+- **첨부 파일**([services/files.py](src/rcompass/services/files.py)):
+  - 내용은 `<data_dir>/files/sha256/<앞 2자리>/<sha256>`에 저장합니다. 사용자가 준 파일 이름은 경로에 쓰지 않고, DB의 `rel_path`는 `blob_path`가 검증한 뒤에만 엽니다.
+  - 같은 내용은 디스크에 한 번만 저장되고, `FileObject` 기록은 첨부할 때마다 새로 만듭니다.
+  - 업로드 라우트는 **DB를 건드리기 전에** `store_stream`으로 저장합니다. 복사와 해시 계산 동안 `BEGIN IMMEDIATE` 쓰기 잠금을 잡지 않기 위해서입니다. 실패하거나 404가 나면 `discard_if_unreferenced`로 고아 내용을 지웁니다.
+  - 외부 참조의 지문 계산도 같은 이유로 "대상 확인 → `session.rollback()` → 해시 계산 → 짧은 트랜잭션으로 기록" 순서를 지킵니다(`verification_target`, `compute_fingerprint`, `apply_fingerprint`). 오래 걸리는 파일 입출력은 트랜잭션 밖에서 합니다.
+  - 파일을 내려줄 때 PNG·JPEG·GIF·WebP와 텍스트만 inline으로 보내고, 나머지(SVG·HTML·PDF 등)는 `attachment`로 보냅니다. 모든 응답에 `nosniff`와 `CSP sandbox`를 붙입니다.
+  - 요청 크기는 `BodySizeLimitMiddleware`(순수 ASGI)가 받는 바이트를 세어 넘으면 `HTTPException(413)`을 던집니다. chunked 요청도 이렇게 막습니다.
+  - 지문 계산은 로컬·NAS 절대 경로와 `file://`(UNC 포함)만 대상으로 합니다. 상대 경로는 서버의 현재 폴더(소스 저장소일 수 있음)를 기준으로 엉뚱한 파일을 읽을 수 있어 계산하지 않습니다. 원본은 읽기만 합니다.
 - **짧은 ID**([ids.py](src/rcompass/ids.py)): 모두 1부터 발급합니다. `E0`(기준선 측정 실험)과 `B0`은 프로젝트를 만들 때 `BASELINE_MEASUREMENT_ID`와 `BASELINE_ZERO_ID`로 직접 붙입니다. 실행 ID는 `scope=f"R:{experiment_id}"`로 실험마다 R1부터 시작합니다.
 - 이후 단계에서 지킬 도메인 규칙(계획서 4절):
   - `Decision`과 `BaselineChange`는 추가만 가능하고, 수정하거나 삭제하는 API를 만들지 않습니다.
   - 채택하면 `Baseline.run_ids`에 실행 스냅샷을 고정합니다. 채택 뒤 실행을 추가하거나 제외해도 기준선 수치는 바뀌지 않습니다.
   - 성공 기준 상태는 `미측정`, `근거 부족`(`min_runs` 미달), `미달`, `달성` 네 가지이고, 작업 진행률과 목표 달성은 따로 계산합니다.
-  - 앱은 연구 저장소의 Git이나 원본 파일을 절대 읽거나 쓰지 않습니다. 커밋 SHA는 텍스트로만 다룹니다.
+  - 앱은 연구 저장소의 Git이나 원본 파일을 절대 쓰지 않습니다. 원본을 읽는 것은 사용자가 누른 "지문 계산"(읽기 전용 해시)뿐입니다. 커밋 SHA는 텍스트로만 다룹니다.
 - 외부 LLM API 없이 동작해야 합니다. LLM 연동은 선택 기능으로만 추가합니다.
 
 ## 단계 완료 기준

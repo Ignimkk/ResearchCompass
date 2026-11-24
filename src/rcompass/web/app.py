@@ -14,11 +14,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from rcompass import __version__
 from rcompass.config import Settings
 from rcompass.db import open_database, session_factory
-from rcompass.web.routes import experiments, problems, projects
-from rcompass.web.security import LOCAL_HOSTS, LocalOnlyMiddleware
+from rcompass.web.routes import experiments, materials, problems, projects
+from rcompass.web.security import LOCAL_HOSTS, BodySizeLimitMiddleware, LocalOnlyMiddleware
 from rcompass.web.templating import WEB_DIR, templates
 
-ERROR_TITLES = {404: "페이지를 찾을 수 없습니다", 405: "허용되지 않는 요청입니다"}
+ERROR_TITLES = {404: "페이지를 찾을 수 없습니다", 405: "허용되지 않는 요청입니다", 413: "요청이 너무 큽니다"}
 
 
 def _error_page(request: Request, status_code: int, title: str, message: str) -> HTMLResponse:
@@ -41,6 +41,8 @@ def create_app(settings: Settings, *, allowed_hosts: Sequence[str] = LOCAL_HOSTS
 
     app = FastAPI(title="연구 나침반", version=__version__, lifespan=lifespan)
     app.state.settings = settings
+    # 폼 필드와 multipart 오버헤드를 위해 1MB 여유를 둡니다. 나중에 추가한 미들웨어가 바깥쪽입니다.
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_attachment_bytes + 1024 * 1024)
     app.add_middleware(LocalOnlyMiddleware, allowed_hosts=allowed_hosts)
 
     @app.exception_handler(StarletteHTTPException)
@@ -60,6 +62,7 @@ def create_app(settings: Settings, *, allowed_hosts: Sequence[str] = LOCAL_HOSTS
     app.include_router(projects.router)
     app.include_router(problems.router)
     app.include_router(experiments.router)
+    app.include_router(materials.router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

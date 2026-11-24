@@ -14,9 +14,10 @@ from urllib.parse import urlsplit
 
 from fastapi import Request
 from fastapi.responses import PlainTextResponse
+from starlette.exceptions import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -31,6 +32,48 @@ def _netloc(value: str) -> str | None:
 
 def _hostname(host_header: str) -> str:
     return urlsplit(f"//{host_header}").hostname or ""
+
+
+class BodySizeLimitMiddleware:
+    """요청 본문이 상한을 넘으면 받는 도중에 413으로 끊습니다.
+
+    Content-Length가 상한보다 크면 첫 조각을 읽을 때, 길이를 밝히지 않은(chunked) 요청은 누적 바이트가
+    상한을 넘는 순간 중단합니다. 그래서 multipart 해석기가 거대한 본문을 임시 폴더에 다 받아 두는 일이 없습니다.
+    HTTPException(413)으로 알리므로 앱의 한국어 오류 페이지로 보입니다(FastAPI는 본문 해석 중의
+    HTTPException을 그대로 다시 던집니다).
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    def _too_large(self) -> HTTPException:
+        limit_mb = max(1, self.max_bytes // (1024 * 1024))
+        return HTTPException(
+            status_code=413,
+            detail=f"요청이 너무 큽니다(최대 약 {limit_mb}MB). 큰 데이터는 자료 화면에서 위치(경로나 URL)로 기록하세요.",
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        length = dict(scope.get("headers") or []).get(b"content-length", b"")
+        declared_too_large = length.isdigit() and int(length) > self.max_bytes
+        received = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            if declared_too_large:
+                raise self._too_large()
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise self._too_large()
+            return message
+
+        await self.app(scope, limited_receive, send)
 
 
 class LocalOnlyMiddleware(BaseHTTPMiddleware):
