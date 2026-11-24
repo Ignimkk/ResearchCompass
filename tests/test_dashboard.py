@@ -183,7 +183,7 @@ def test_unmeasured_criterion_offers_measurement(client: TestClient) -> None:
     assert "E0#results" not in page and ">측정 실험 만들기</a>" in page
     client.post("/projects/1/focus", data={"problem": "P1"})
     page = client.get("/projects/1").text
-    assert 'href="/projects/1/problems/P1/experiments/new">측정 실험 만들기</a>' in page
+    assert 'href="/projects/1/measurements/new?problem=P1">측정 실험 만들기</a>' in page
     assert 'href="/projects/1/problems/new?parent=P1">새 하위 문제</a>' in page
 
 

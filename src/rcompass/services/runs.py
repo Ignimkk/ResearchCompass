@@ -9,7 +9,9 @@
 규칙
 - 같은 이름의 실행이 있으면 그 실행의 값을 고치고, 없으면 새 실행(R1, R2, …)을 만듭니다.
 - 기준선의 근거(스냅샷)인 실행의 값은 바꿀 수 없습니다. 기준선 수치가 몰래 바뀌지 않게 하기 위해서입니다.
-- 기준선 측정 실험(E0)에 새 실행을 기록하면, B0이 현재 기준선일 때 B0 스냅샷을 넓힙니다(snapshot_update).
+- 기준선 측정 실험(E0, 또는 나중에 만든 측정 실험)에 새 실행을 기록하면, 그 실험이 재는 기준선이
+  아직 현재 기준선일 때 스냅샷을 넓힙니다(snapshot_update). E0 밖의 측정 실험은 그 기준선이 아직 재지 않은
+  지표만 기록할 수 있습니다. 채택한 기준선이 이미 가진 수치는 바뀌지 않습니다.
 """
 
 from __future__ import annotations
@@ -107,6 +109,8 @@ def parse_results_table(text: str) -> ParsedTable:
             if not cell or cell == "-":
                 continue  # 이 실행에서 재지 않은 지표
             try:
+                if "_" in cell:  # float()는 1_000 같은 자릿수 구분을 받아들이지만, 오타일 수 있어 거부합니다.
+                    raise ValueError(cell)
                 value = float(cell)
             except ValueError:
                 problems.append(f"{number}번째 줄: '{cell}'은(는) 숫자가 아닙니다.")
@@ -177,6 +181,21 @@ def record_results(
                     f"{row.line}번째 줄: {run.short_id}({run.label})은(는) 기준선 {', '.join(locked[run.id])}의 근거라 "
                     f"{key} 값을 바꿀 수 없습니다. 새 실행 이름으로 기록하세요."
                 )
+    target = measured_baseline(session, experiment)
+    if (target is not None and target.id == project.current_baseline_id
+            and target.source_experiment_id != experiment.id):
+        # E0(B0) 밖의 측정 실험은 현재 기준선이 아직 재지 않은 지표만 채웁니다. 채택한 기준선의 수치는 바뀌지 않습니다.
+        held = snapshot_metric_keys(session, target)
+        for row in table.rows:
+            run = existing.get(row.label) if row.label else None
+            if run is not None and run.id in locked:
+                continue
+            for key in row.values:
+                if key in held:
+                    problems.append(
+                        f"{row.line}번째 줄: 기준선 {target.short_id}은(는) {key}를 이미 근거로 가지고 있어 측정 실험으로 "
+                        f"바꿀 수 없습니다. 다시 재려면 일반 실험으로 기록하고 판정하세요."
+                    )
     new_rows = sum(1 for row in table.rows if not row.label or row.label not in existing)
     if len(existing) + new_rows > MAX_RUNS:
         problems.append(f"실험 하나에는 실행을 {MAX_RUNS}개까지 기록할 수 있습니다(지금 {len(existing)}개).")
@@ -229,9 +248,28 @@ def _auto_label(short_id: str, existing: dict[str, Run]) -> str:
     return label if label not in existing else f"{label} ({short_id})"
 
 
+def snapshot_metric_keys(session: Session, baseline: Baseline) -> set[str]:
+    """기준선 근거 실행에 기록된 지표 이름."""
+    return set(session.scalars(
+        select(MetricResult.metric_key).distinct()
+        .join(BaselineRun, BaselineRun.run_id == MetricResult.run_id)
+        .where(BaselineRun.baseline_id == baseline.id)
+    ))
+
+
+def measured_baseline(session: Session, experiment: Experiment) -> Baseline | None:
+    """기준선 측정 실험이 재는 기준선. E0은 B0의 근거 실험이고, 나중에 만든 측정 실험은 만들 때의 현재 기준선을 잽니다."""
+    if experiment.kind is not ExperimentKind.BASELINE_MEASUREMENT:
+        return None
+    source = session.scalars(select(Baseline).where(Baseline.source_experiment_id == experiment.id)).first()
+    if source is not None:
+        return source
+    return session.get(Baseline, experiment.based_on_baseline_id) if experiment.based_on_baseline_id else None
+
+
 def _extend_baseline_snapshot(session: Session, project: Project, experiment: Experiment,
                               outcome: RecordOutcome) -> None:
-    baseline = session.scalars(select(Baseline).where(Baseline.source_experiment_id == experiment.id)).first()
+    baseline = measured_baseline(session, experiment)
     if baseline is None:
         return
     if baseline.id != project.current_baseline_id:

@@ -25,6 +25,7 @@ from rcompass.services.decisions import (
     revoke_plan,
 )
 from rcompass.services.experiments import (
+    create_measurement,
     INPUTS_LOCKED,
     PLAN_LOCKED,
     create_experiment,
@@ -50,9 +51,11 @@ from rcompass.services.runs import (
     exclude_run,
     experiment_results,
     get_run,
+    measured_baseline,
     parse_results_table,
     record_results,
 )
+from rcompass.services.progress import evaluate_project
 from rcompass.web.charts import strip_chart
 from rcompass.web.context import Crumb, project_context
 from rcompass.web.deps import get_session
@@ -81,7 +84,7 @@ def experiment_url(project: Project, experiment: Experiment) -> str:
     return f"/projects/{project.id}/experiments/{experiment.short_id}"
 
 
-def _experiment_context(session: Session, project: Project, experiment: Experiment) -> dict:
+def experiment_context(session: Session, project: Project, experiment: Experiment) -> dict:
     problem = session.get(Problem, experiment.problem_id) if experiment.problem_id else None
     path = problem_path(session, problem) if problem else []
     tail = [Crumb(f"{experiment.short_id} {experiment.title}")]
@@ -115,9 +118,9 @@ def _decision_context(session: Session, project: Project, experiment: Experiment
     }
 
 
-def _render_detail(request: Request, session: Session, project: Project, experiment: Experiment, *,
+def render_detail(request: Request, session: Session, project: Project, experiment: Experiment, *,
                    errors: dict | None = None, values: dict | None = None, status_code: int = 200) -> HTMLResponse:
-    context = _experiment_context(session, project, experiment)
+    context = experiment_context(session, project, experiment)
     inputs = input_versions(session, experiment)
     params = request.query_params
     return templates.TemplateResponse(
@@ -127,6 +130,7 @@ def _render_detail(request: Request, session: Session, project: Project, experim
             **context,
             "experiment": experiment,
             "is_baseline_measurement": experiment.kind is ExperimentKind.BASELINE_MEASUREMENT,
+            "measured": measured_baseline(session, experiment),
             "start_baseline": session.get(Baseline, experiment.based_on_baseline_id)
             if experiment.based_on_baseline_id else None,
             "results": experiment_results(session, experiment),
@@ -197,13 +201,58 @@ def create_experiment_route(
     return RedirectResponse(experiment_url(project, experiment), status_code=303)
 
 
+@router.get("/measurements/new", response_class=HTMLResponse)
+def new_measurement(request: Request, project_id: int, session: SessionDep, problem: str = "") -> HTMLResponse:
+    project = _project_or_404(session, project_id)
+    owner = None
+    if problem.strip():
+        owner = get_problem(session, project.id, problem.strip())
+        if owner is None:
+            raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+    return _render_measurement(request, session, project, owner, {}, {})
+
+
+def _render_measurement(request: Request, session: Session, project: Project, problem: Problem | None,
+                        values: dict, errors: dict, status_code: int = 200) -> HTMLResponse:
+    path = problem_path(session, problem) if problem else []
+    context = project_context(session, project, path=path, tail=[Crumb("기준선 측정 실험")],
+                              section="home", return_to_question=not path)
+    measured = [e for e in evaluate_project(session, project) if e.state.value == "unmeasured"]
+    return templates.TemplateResponse(
+        request, "measurement_new.html",
+        {**context, "problem": problem, "values": values, "errors": errors, "unmeasured": measured},
+        status_code=status_code,
+    )
+
+
+@router.post("/measurements")
+def create_measurement_route(
+    request: Request, project_id: int, session: SessionDep,
+    problem: FormText = "", title: FormText = "", code_ref: FormText = "", config_text: FormText = "",
+) -> Response:
+    project = _project_or_404(session, project_id)
+    problem = problem.strip()
+    owner = get_problem(session, project.id, problem) if problem else None
+    if problem and owner is None:
+        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+    try:
+        experiment = create_measurement(session, project, title=title, problem_short_id=problem,
+                                        code_ref=code_ref, config_text=config_text)
+    except ValidationError as error:
+        session.rollback()
+        values = {"title": title, "code_ref": code_ref, "config_text": config_text}
+        return _render_measurement(request, session, project, owner, values, error.errors, status_code=422)
+    session.commit()
+    return RedirectResponse(experiment_url(project, experiment) + "#results", status_code=303)
+
+
 # ---------------------------------------------------------------- 상세와 수정
 
 
 @router.get("/experiments/{short_id}", response_class=HTMLResponse)
 def experiment_page(request: Request, project_id: int, short_id: str, session: SessionDep) -> HTMLResponse:
     project = _project_or_404(session, project_id)
-    return _render_detail(request, session, project, _experiment_or_404(session, project, short_id))
+    return render_detail(request, session, project, _experiment_or_404(session, project, short_id))
 
 
 @router.post("/experiments/{short_id}/plan")
@@ -219,7 +268,7 @@ def update_plan_route(
     except ValidationError as error:
         session.rollback()
         values = {"title": title, "hypothesis": hypothesis, "decision_rule": decision_rule, "plan_open": True}
-        return _render_detail(request, session, project, experiment, errors=error.errors, values=values,
+        return render_detail(request, session, project, experiment, errors=error.errors, values=values,
                               status_code=422)
     session.commit()
     return RedirectResponse(experiment_url(project, experiment) + "?saved=plan", status_code=303)
@@ -245,7 +294,7 @@ async def update_inputs_route(request: Request, project_id: int, short_id: str) 
                 session.rollback()
                 errors = error.errors if isinstance(error, ValidationError) else {"inputs": "데이터 버전 선택이 올바르지 않습니다."}
                 values = {"code_ref": code_ref, "config_text": config_text, "input_ids": set(raw_ids)}
-                return _render_detail(request, session, project, experiment, errors=errors, values=values,
+                return render_detail(request, session, project, experiment, errors=errors, values=values,
                                       status_code=422)
             session.commit()
             return RedirectResponse(experiment_url(project, experiment) + "?saved=inputs", status_code=303)
@@ -270,7 +319,7 @@ def record_results_route(
     except (ValueError, ValidationError) as error:
         session.rollback()
         errors = error.errors if isinstance(error, ValidationError) else {"results": "데이터 버전 선택이 올바르지 않습니다."}
-        return _render_detail(request, session, project, experiment, errors=errors,
+        return render_detail(request, session, project, experiment, errors=errors,
                               values={"results": results, "dataset_version": dataset_version}, status_code=422)
     session.commit()
     params = {"saved": "results"}
@@ -295,7 +344,7 @@ def exclude_run_route(
         exclude_run(session, run, reason)
     except ValidationError as error:
         session.rollback()
-        return _render_detail(request, session, project, experiment,
+        return render_detail(request, session, project, experiment,
                               errors={f"exclude-{run.short_id}": error.errors["reason"]}, status_code=422)
     session.commit()
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=exclude#results", status_code=303)
@@ -346,7 +395,7 @@ def upload_file_route(
         session.rollback()
         if blob is not None:
             discard_if_unreferenced(session, settings.data_dir, blob)
-        return _render_detail(request, session, project, experiment, errors={"upload": " ".join(problems)},
+        return render_detail(request, session, project, experiment, errors={"upload": " ".join(problems)},
                               values={"caption": caption, "kind": kind, "run": run}, status_code=422)
     session.commit()
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=file#files", status_code=303)
@@ -376,7 +425,7 @@ def decide_route(
         session.rollback()
         values = {"type": type, "reason": reason, "baseline_label": baseline_label,
                   "revisit_condition": revisit_condition}
-        return _render_detail(request, session, project, experiment, errors=error.errors, values=values,
+        return render_detail(request, session, project, experiment, errors=error.errors, values=values,
                               status_code=422)
     session.commit()
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=decision#decision", status_code=303)
@@ -395,7 +444,7 @@ def revoke_route(
     except ValidationError as error:
         session.rollback()
         values = {"revoke_reason": reason, "revoke_target": target}
-        return _render_detail(request, session, project, experiment, errors=error.errors, values=values,
+        return render_detail(request, session, project, experiment, errors=error.errors, values=values,
                               status_code=422)
     session.commit()
     return RedirectResponse(f"{experiment_url(project, experiment)}?saved=revoke#decision", status_code=303)

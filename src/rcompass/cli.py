@@ -94,6 +94,63 @@ def migrate(data_dir: DataDirOption = None) -> None:
     typer.echo("스키마를 최신 버전으로 올렸습니다.")
 
 
+@app.command()
+def handoff(
+    project_id: Annotated[Optional[int], typer.Argument(help="프로젝트 번호 (프로젝트가 하나면 생략 가능)")] = None,
+    experiment: Annotated[Optional[str], typer.Option("--experiment", "-e", help="결과 보고 형식에 넣을 실험 ID (예: E3)")] = None,
+    output: Annotated[Optional[str], typer.Option("--output", "-o", help="Markdown을 저장할 파일 (기본: 화면 출력)")] = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Claude Code 새 세션에 붙여넣을 인계 Markdown을 만듭니다. DB는 읽기만 합니다."""
+    from datetime import date
+    from pathlib import Path
+
+    from rcompass.db import STATUS_MESSAGES, SchemaStatus, check_schema, create_db_engine, session_factory
+    from rcompass.services.experiments import get_experiment
+    from rcompass.services.handoff import HandoffOptions, build_handoff
+    from rcompass.services.projects import get_project, list_projects
+
+    resolved, _ = resolve_data_dir(data_dir)
+    settings = Settings(data_dir=resolved)
+    if not settings.db_path.exists():
+        typer.secho(f"오류: {settings.db_path}에 기록이 없습니다. --data-dir을 확인하세요.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    status = check_schema(settings.db_path)
+    if status is not SchemaStatus.CURRENT:
+        typer.secho(f"오류: {STATUS_MESSAGES[status]}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    engine = create_db_engine(settings.db_path)
+    try:
+        with session_factory(engine)() as session:
+            if project_id is None:
+                projects = list_projects(session)
+                if len(projects) != 1:
+                    names = ", ".join(f"{p.id} {p.title}" for p in projects) or "없음"
+                    typer.secho(f"오류: 프로젝트 번호를 적어 주세요. 프로젝트: {names}", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(code=2)
+                project = projects[0]
+            else:
+                project = get_project(session, project_id)
+                if project is None:
+                    typer.secho(f"오류: 프로젝트 {project_id}을(를) 찾을 수 없습니다.", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(code=1)
+            target = None
+            if experiment:
+                target = get_experiment(session, project.id, experiment.strip().upper())
+                if target is None:
+                    typer.secho(f"오류: 실험 {experiment}을(를) 찾을 수 없습니다.", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(code=1)
+            text = build_handoff(session, project, HandoffOptions(today=date.today(), experiment=target))
+            session.rollback()
+    finally:
+        engine.dispose()
+    if output:
+        Path(output).write_text(text, encoding="utf-8")
+        typer.echo(f"인계 문서를 {output}에 저장했습니다.", err=True)
+    else:
+        typer.echo(text, nl=False)
+
+
 def _exit_if_schema_mismatch(settings: Settings) -> None:
     """서버를 띄우기 전에 기존 DB의 스키마를 확인합니다. 새 DB는 서버 시작 시 만들어집니다."""
     if not settings.db_path.exists():

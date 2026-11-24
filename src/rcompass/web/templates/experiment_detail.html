@@ -10,6 +10,7 @@
 </div>
 
 {% if notice.saved == 'results' %}<p class="notice" role="status">결과를 기록했습니다.{% if notice.snapshot %} 새 실행을 기준선 {{ notice.snapshot }}의 근거에 더했습니다.{% endif %}</p>{% endif %}
+{% if notice.saved == 'claude' %}<p class="notice" role="status">Claude Code 결과를 확인하고 기록했습니다(출처: Claude 확인).{% if notice.snapshot %} 새 실행을 기준선 {{ notice.snapshot }}의 근거에 더했습니다.{% endif %}</p>{% endif %}
 {% if notice.saved == 'decision' %}<p class="notice" role="status">판정을 기록했습니다. 앱 기록만 바뀌었고, 연구 저장소의 Git과 파일은 그대로입니다.</p>{% endif %}
 {% if notice.saved == 'revoke' %}<p class="notice" role="status">채택을 철회했습니다. 현재 기준선은 {{ baseline.short_id }} {{ baseline.label }}입니다. 원래 채택 결정과 기준선 기록은 남아 있습니다.</p>{% endif %}
 {% if notice.saved in ('plan', 'inputs', 'exclude', 'file') %}<p class="notice" role="status">저장했습니다.</p>{% endif %}
@@ -19,7 +20,14 @@
 {% if is_baseline_measurement %}
 <section class="card">
   <h2>기준선 측정</h2>
-  <p>현재 방식의 성능을 재는 실험입니다. 여기에 기록한 실행이 기준선 B0의 근거가 됩니다(B0이 현재 기준선일 때).</p>
+  {% if measured %}
+  <p>기준선 <span class="id">{{ measured.short_id }}</span> {{ measured.label }}의 성능을 재는 실험입니다. 가설과 판정은 없습니다.</p>
+  {% if baseline and measured.id == baseline.id %}
+  <p>여기에 기록한 새 실행은 현재 기준선 {{ measured.short_id }}의 근거에 더해져, 홈의 목표 달성 판정에 바로 반영됩니다.</p>
+  {% else %}
+  <p class="warning" role="note">{{ measured.short_id }}은(는) 지금 현재 기준선이 아닙니다{% if baseline %}(현재 {{ baseline.short_id }}){% endif %}. 새로 기록하는 실행은 기준선 근거에 들어가지 않습니다.</p>
+  {% endif %}
+  {% endif %}
 </section>
 {% else %}
 <div class="two-col">
@@ -144,6 +152,18 @@
       </label>
       {% endif %}
       <button type="submit" class="button primary">결과 기록</button>
+    </form>
+  </details>
+  <details class="later" id="claude-block" {% if errors.get('block') %}open{% endif %}>
+    <summary>Claude Code 결과 붙여넣기 (rcompass-result 블록)</summary>
+    <form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/result-block" class="stack">
+      <p class="hint">Claude Code가 출력한 블록을 그대로 붙여넣으세요. 앞뒤 설명이 섞여 있어도 블록만 읽습니다. 다음 화면에서 값을 확인하고 고친 뒤에야 기록됩니다.
+        블록 형식은 <a href="/projects/{{ project.id }}/handoff?experiment={{ experiment.short_id }}">이 실험용 인계 문서</a> 끝에 있습니다.</p>
+      <textarea name="block" rows="8" spellcheck="false" class="mono" placeholder="```rcompass-result&#10;experiment: {{ experiment.short_id }}&#10;runs:&#10;  - {label: seed=1, metrics: {...}}&#10;```"
+        {% if errors.get('block') %}aria-invalid="true" aria-describedby="block-error"{% endif %}>{{ values.get('block', '') }}</textarea>
+      {% if errors.get('block') %}<div class="field-error" id="block-error">{% for line in errors['block'].split('
+') %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
+      <button type="submit" class="button">미리보기</button>
     </form>
   </details>
 </section>

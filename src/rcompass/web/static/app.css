@@ -355,3 +355,8 @@ ol.baseline-history li { padding: 0.15rem 0; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Claude Code 인계와 결과 블록 */
+.handoff-text { width: 100%; font-size: 0.85rem; line-height: 1.5; margin-bottom: 1rem; white-space: pre-wrap; }
+.status-line { min-height: 1.5em; margin: 0.25rem 0; color: var(--met); font-size: 0.9rem; }
+.actions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }

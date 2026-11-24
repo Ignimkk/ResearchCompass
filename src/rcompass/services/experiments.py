@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from rcompass.ids import next_short_id
 from rcompass.models import (
+    Baseline,
     Experiment,
     ExperimentKind,
     ExperimentOutcome,
@@ -71,6 +72,43 @@ def create_experiment(
         title=_clean(title),
         hypothesis=_clean(hypothesis),
         decision_rule=_clean(decision_rule),
+        code_ref=_clean(code_ref),
+        config_text=_clean(config_text),
+    )
+    session.add(experiment)
+    session.flush()
+    return experiment
+
+
+def create_measurement(
+    session: Session,
+    project: Project,
+    *,
+    title: str | None = None,
+    problem_short_id: str | None = None,
+    code_ref: str | None = None,
+    config_text: str | None = None,
+) -> Experiment:
+    """현재 기준선을 재는 측정 실험을 만듭니다(E0이 B0에 하듯이).
+
+    여기에 기록한 실행은 이 기준선이 아직 현재 기준선이면 그 근거(스냅샷)에 더해집니다. 가설과 판정은 없습니다.
+    현재 기준선에서 재지 않은 지표(예: 응답 시간)를 나중에 채울 때 씁니다. 호출한 쪽이 커밋합니다.
+    """
+    baseline = session.get(Baseline, project.current_baseline_id) if project.current_baseline_id else None
+    if baseline is None:
+        raise ValidationError({"title": "현재 기준선이 없어 측정 실험을 만들 수 없습니다."})
+    problem = None
+    if _clean(problem_short_id):
+        problem = get_problem(session, project.id, problem_short_id.strip())
+        if problem is None:
+            raise ValidationError({"problem": "문제를 찾을 수 없습니다."})
+    experiment = Experiment(
+        project_id=project.id,
+        short_id=next_short_id(session, project.id, "E"),
+        kind=ExperimentKind.BASELINE_MEASUREMENT,
+        problem_id=problem.id if problem else None,
+        based_on_baseline_id=baseline.id,
+        title=_clean(title) or f"기준선 측정: {baseline.short_id} {baseline.label}",
         code_ref=_clean(code_ref),
         config_text=_clean(config_text),
     )

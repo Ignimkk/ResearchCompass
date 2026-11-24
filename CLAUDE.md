@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트
 
-연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 7단계(프로젝트 홈 대시보드)까지 끝났습니다.
+연구 나침반(`rcompass`)은 로컬에서 혼자 연구하는 사람을 위한 연구 기록 웹앱입니다. 다루는 흐름은 연구 질문, 문제 트리, 실험과 실행(Run), 결정(채택·기각·보류·철회), 기준선, 자료 계보, Claude Code 인계입니다. 설계와 단계별 구현 순서는 [docs/implementation-plan.md](docs/implementation-plan.md)에 있고, 작업할 때는 이 계획서의 단계 번호(6절)를 기준으로 진행합니다. 현재 8단계(Claude Code 인계와 결과 블록)까지 끝났습니다.
 
 UI 문구, 문서, 사용자에게 보이는 메시지는 한국어로 씁니다.
 
@@ -51,7 +51,9 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
 - **결과 기록**([services/runs.py](src/rcompass/services/runs.py)):
   - 결과는 "실행 × 지표" 표(첫 줄 머리글, 탭·쉼표·공백 구분)로 받습니다. 실행은 실험 안에서 이름으로 찾습니다(이름은 고유 인덱스).
   - 기준선 스냅샷(`BaselineRun`)에 든 실행은 값이든 메타데이터든 다시 쓰지 않습니다.
-  - E0에 새 실행을 기록하면, B0이 현재 기준선일 때만 `snapshot_update`로 B0 근거를 넓힙니다.
+  - 기준선 측정 실험(`ExperimentKind.BASELINE_MEASUREMENT`)에 새 실행을 기록하면, 그 실험이 재는 기준선(`measured_baseline`)이 아직 현재 기준선일 때만 `snapshot_update`로 근거를 넓힙니다.
+    - E0은 B0을 재고, 지표에 제한이 없습니다.
+    - 나중에 만든 측정 실험(`create_measurement`)은 만들 때의 현재 기준선을 재고, 그 기준선이 아직 재지 않은 지표만 기록할 수 있습니다. 채택한 기준선이 이미 가진 수치는 바뀌지 않습니다.
 - **첨부 파일**([services/files.py](src/rcompass/services/files.py)):
   - 내용은 `<data_dir>/files/sha256/<앞 2자리>/<sha256>`에 저장합니다. 사용자가 준 파일 이름은 경로에 쓰지 않고, DB의 `rel_path`는 `blob_path`가 검증한 뒤에만 엽니다.
   - 같은 내용은 디스크에 한 번만 저장되고, `FileObject` 기록은 첨부할 때마다 새로 만듭니다.
@@ -70,6 +72,11 @@ uv run pytest tests/test_cli.py::test_invalid_port_is_rejected   # 단일 테스
   - 철회의 기본 복귀 대상은 철회되지 않은 가장 가까운 조상입니다. 철회하는 기준선이 현재 기준선이 아니면 복귀 대상을 직접 고르게 합니다.
   - 판정한 실험은 가설과 판정 기준을, 채택했던 실험은 입력을 고칠 수 없습니다(`PLAN_LOCKED`, `INPUTS_LOCKED`).
   - 판정 폼에는 맨 앞에 비활성 제출 버튼을 둡니다. Enter 키로 되돌릴 수 없는 판정이 제출되는 것을 막기 위해서입니다.
+- **Claude Code 연동**([services/handoff.py](src/rcompass/services/handoff.py), [services/result_block.py](src/rcompass/services/result_block.py), [integrations/claude-code/](integrations/claude-code/)):
+  - 인계 Markdown은 계획서 5절 예시 구조를 따르고 `tests/test_handoff.py`의 스냅샷으로 고정합니다. 구조를 바꾸면 스냅샷과 `rcompass-result` 스킬을 함께 고칩니다.
+  - 결과 블록은 PyYAML `compose`로 노드만 읽고 값은 글자 그대로 다룹니다(형 변환 없음, 오류마다 붙여넣은 텍스트 기준 줄 번호). 별칭(&, *)은 거부합니다.
+  - 미리보기 라우트는 DB에 쓰지 않습니다. 기록은 "확인하고 기록"(`confirm_results`)에서만 하고 provenance는 `claude_confirmed`입니다.
+  - 템플릿에 넣는 값은 `yaml_value`로 필요할 때 따옴표로 감쌉니다. 그대로 넣을 수 없는 값(여러 줄, 너무 긴 값)은 `<...>` 안내 문구로 두고, 안내 문구는 빈 값으로 읽습니다. 값을 줄여 넣으면 다른 값으로 기록되기 때문입니다.
 - **프로젝트 홈**([services/dashboard.py](src/rcompass/services/dashboard.py)):
   - 목표 달성(현재 기준선 스냅샷의 판정)과 작업 진행(판정을 마친 실험 수, 해결한 문제 수)은 따로 계산하고 화면에서도 나눠 보여줍니다.
   - "최근 시도"는 지표를 마지막으로 기록한 시도 실험(E0 제외)입니다. 값을 다시 기록하면 `record_results`가 결과 행을 지우고 새로 만들어, `MetricResult.id` 순서가 기록 순서가 되게 합니다.

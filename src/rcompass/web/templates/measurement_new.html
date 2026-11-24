@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}기준선 측정 실험 · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% macro err(name) %}{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ errors[name] }}</p>{% endif %}{% endmacro %}
+{% block content %}
+<h1>기준선 측정 실험</h1>
+<section class="card">
+  <p>현재 기준선{% if baseline %} <span class="id">{{ baseline.short_id }}</span> {{ baseline.label }}{% endif %}을(를) 그대로 두고 성능만 다시 재는 실험입니다.
+    여기에 기록한 실행은 이 기준선의 근거에 더해져 홈의 목표 달성 판정에 반영됩니다. 가설과 판정(채택·기각)은 없습니다.</p>
+  {% if unmeasured %}<p class="muted">현재 기준선에서 아직 재지 않은 기준: {% for e in unmeasured %}<span class="id">{{ e.criterion.short_id }}</span> {{ e.criterion.name }} (<code>{{ e.criterion.metric_key }}</code>){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  <p class="hint">방식을 바꿔서 잰 결과라면 측정 실험이 아니라 일반 실험으로 기록하고 판정하세요.</p>
+</section>
+{% if errors %}<div class="error-summary" role="alert"><p><strong>입력을 확인해 주세요.</strong></p>{% for m in errors.values() %}<p>{{ m }}</p>{% endfor %}</div>{% endif %}
+<form method="post" action="/projects/{{ project.id }}/measurements" class="stack card">
+  {% if problem %}<input type="hidden" name="problem" value="{{ problem.short_id }}">
+  <p class="muted">관련 문제: <span class="id">{{ problem.short_id }}</span> {{ problem.title }}</p>{% endif %}
+  <label>제목 (비우면 "기준선 측정: {{ baseline.short_id if baseline else '' }} …")
+    <input name="title" value="{{ values.get('title', '') }}" placeholder="예: B2 응답 시간 측정"></label>
+  {{ err('title') }}
+  <label>코드 버전 (커밋 SHA 또는 메모)
+    <input name="code_ref" value="{{ values.get('code_ref', '') }}" spellcheck="false"></label>
+  <label>설정
+    <textarea name="config_text" rows="2" spellcheck="false">{{ values.get('config_text', '') }}</textarea></label>
+  <button type="submit" class="button primary">측정 실험 만들기</button>
+</form>
+{% endblock %}

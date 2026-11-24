@@ -6,6 +6,7 @@
 <div class="page-head">
   <h1>{{ project.title }}</h1>
   <div class="actions">
+    <a class="button" href="/projects/{{ project.id }}/handoff">Claude Code 인계</a>
     <a class="button" href="/projects/{{ project.id }}/problems/new{% if focus %}?parent={{ focus.short_id }}{% endif %}">새 하위 문제</a>
     {% if focus %}<a class="button primary" href="/projects/{{ project.id }}/problems/{{ focus.short_id }}/experiments/new">새 실험</a>
     {% else %}<a class="button primary" href="/projects/{{ project.id }}/problems">문제를 골라 새 실험</a>{% endif %}
@@ -63,15 +64,14 @@
             {% if e.state.value == 'insufficient' %}<br><span class="muted">실행 {{ e.aggregated.n }}/{{ e.criterion.min_runs }}</span>{% endif %}
             {% if e.state.value == 'unmeasured' %}<br>
               {% if d.on_baseline_zero %}<a class="button small" href="/projects/{{ project.id }}/experiments/E0#results">측정값 기록</a>
-              {% elif focus %}<a class="button small" href="/projects/{{ project.id }}/problems/{{ focus.short_id }}/experiments/new">측정 실험 만들기</a>
-              {% else %}<a class="button small" href="/projects/{{ project.id }}/problems">측정 실험 만들기</a>{% endif %}
+              {% else %}<a class="button small" href="/projects/{{ project.id }}/measurements/new{% if focus %}?problem={{ focus.short_id }}{% endif %}">측정 실험 만들기</a>{% endif %}
             {% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="hint">현재 기준선 값은 기준선의 근거 실행으로만 계산합니다. 최근 시도는 그 지표를 마지막으로 기록한 실험이고, 채택하기 전에는 목표 달성에 반영되지 않습니다.{% if not d.on_baseline_zero %} 현재 기준선에서 재지 않은 기준은 측정 실험을 채택해야 채워집니다.{% endif %}</p>
+  <p class="hint">현재 기준선 값은 기준선의 근거 실행으로만 계산합니다. 최근 시도는 그 지표를 마지막으로 기록한 실험이고, 채택하기 전에는 목표 달성에 반영되지 않습니다. 현재 기준선에서 재지 않은 기준은 기준선 측정 실험에 기록하면 채워집니다.</p>
 </section>
 
 <section class="card">

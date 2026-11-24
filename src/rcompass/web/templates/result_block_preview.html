@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}결과 블록 미리보기 · {{ experiment.short_id }} · {{ project.title }}{% endblock %}
+{% block context %}{% include "_context_bar.html" %}{% endblock %}
+{% block content %}
+<h1>결과 블록 미리보기 <span class="id">{{ experiment.short_id }}</span></h1>
+<p class="warning" role="note">아직 기록하지 않았습니다. 값을 확인하고, 필요하면 고친 뒤 "확인하고 기록"을 누르세요.</p>
+
+{% if preview %}
+{% for w in preview.warnings %}<p class="hint">{{ w }}</p>{% endfor %}
+<section class="card">
+  <h2>Claude Code가 보고한 실행 {{ preview.block.runs|length }}개</h2>
+  <div class="table-wrap">
+    <table class="results">
+      <thead><tr><th scope="col">실행</th>{% for key in preview.block.metrics %}<th scope="col">{{ key }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for run in preview.block.runs %}
+        <tr><th scope="row">{{ run.label }}</th>{% for key in preview.block.metrics %}<td>{{ run.values[key]|target if key in run.values else '—' }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<form method="post" action="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}/result-block/confirm" class="stack card">
+  <h2>기록할 값</h2>
+  <label>실행 × 지표 표 (고칠 수 있습니다)
+    <textarea name="results" rows="{{ [values.results.count('\n') + 2, 20]|min }}" spellcheck="false" class="mono"
+      {% if errors.get('results') %}aria-invalid="true" aria-describedby="results-error"{% endif %}>{{ values.results }}</textarea></label>
+  {% if errors.get('results') %}<div class="field-error" id="results-error" role="alert">{% for line in errors['results'].split('\n') %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
+  <p class="hint">첫 줄은 머리글(label과 지표 이름), 다음 줄부터 실행마다 한 줄. 재지 않은 칸은 '-'입니다. 실행마다 따로 기록됩니다.</p>
+  <label>데이터 버전
+    <select name="dataset_version">
+      <option value="">기록하지 않음</option>
+      {% for v in versions %}<option value="{{ v.version.id }}" {% if values.dataset_version == v.version.id|string %}selected{% endif %}>{{ v.label }}</option>{% endfor %}
+    </select></label>
+  <label>코드 버전 <input name="code" value="{{ values.code }}" spellcheck="false"></label>
+  <label>설정 <input name="config" value="{{ values.config }}" spellcheck="false"></label>
+  <p class="hint">실험에 코드 버전·설정·데이터 버전이 비어 있으면 이 값으로 채웁니다. 이미 있는데 다르면 이번 실행들의 값으로 따로 남깁니다.</p>
+  {% if values.note %}<p><strong>Claude Code의 해석:</strong> {{ values.note }}</p>
+  <p class="hint">해석은 기록되지 않습니다. 판정할 때 이유에 옮겨 적을 수 있습니다.</p>
+  <input type="hidden" name="note" value="{{ values.note }}">{% endif %}
+  {% if values.files %}
+  <div>
+    <p><strong>첨부 제안</strong> · 아래 파일은 자동으로 연결되지 않습니다. 실험 화면의 "결과 그래프·표·설정 첨부"에서 직접 올리세요.</p>
+    <ul>{% for f in values.files %}<li><code class="wrap">{{ f }}</code><input type="hidden" name="files" value="{{ f }}"></li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  <div class="actions-row">
+    <button type="submit" class="button primary">확인하고 기록</button>
+    <a class="button" href="/projects/{{ project.id }}/experiments/{{ experiment.short_id }}#claude-block">취소</a>
+  </div>
+</form>
+{% endblock %}
