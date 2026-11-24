@@ -2,11 +2,76 @@
 {% block title %}{{ project.title }} · 연구 나침반{% endblock %}
 {% block context %}{% include "_context_bar.html" %}{% endblock %}
 {% block content %}
-<h1>{{ project.title }}</h1>
+{% set d = dashboard %}
+<div class="page-head">
+  <h1>{{ project.title }}</h1>
+  <div class="actions">
+    <a class="button" href="/projects/{{ project.id }}/problems/new{% if focus %}?parent={{ focus.short_id }}{% endif %}">새 하위 문제</a>
+    {% if focus %}<a class="button primary" href="/projects/{{ project.id }}/problems/{{ focus.short_id }}/experiments/new">새 실험</a>
+    {% else %}<a class="button primary" href="/projects/{{ project.id }}/problems">문제를 골라 새 실험</a>{% endif %}
+  </div>
+</div>
+
+{% if saved == 'next_action' %}<p class="notice" role="status">다음 행동을 저장했습니다.</p>{% endif %}
+{% for w in d.warnings %}<p class="warning" role="note">{{ w }}</p>{% endfor %}
 
 <section class="card">
   <h2>원래 질문</h2>
   <p class="lead">{{ project.question }}</p>
+</section>
+
+<div class="two-col progress-pair">
+  <section class="card" aria-labelledby="goal-title">
+    <h2 id="goal-title">목표 달성</h2>
+    <p class="big-number">{{ d.met }}<span class="of"> / {{ d.rows|length }}</span></p>
+    <p class="muted">성공 기준 {{ d.rows|length }}개 중 달성 {{ d.met }}</p>
+    <p class="goal-summary">{% for state in states %}<span class="badge state-{{ state.value }}">{{ state_labels[state] }} {{ d.goal[state] }}</span>{% endfor %}</p>
+    <p class="hint">현재 기준선{% if baseline %} {{ baseline.short_id }}{% endif %}의 측정값으로만 판정합니다.</p>
+  </section>
+  <section class="card" aria-labelledby="work-title">
+    <h2 id="work-title">작업 진행</h2>
+    <p class="big-number">{{ d.work.experiments_decided }}<span class="of"> / {{ d.work.experiments_total }}</span></p>
+    <p class="muted">실험 완료 {{ d.work.experiments_decided }}/{{ d.work.experiments_total }} · 문제 해결 {{ d.work.problems_resolved }}/{{ d.work.problems_total }}</p>
+    <p class="hint">완료는 채택·기각·철회로 판정한 실험입니다.{% if d.work.experiments_held %} 보류 {{ d.work.experiments_held }}개.{% endif %}{% if d.work.problems_dropped %} 중단한 문제 {{ d.work.problems_dropped }}개는 빼고 셉니다.{% endif %}</p>
+    {% if d.work.awaiting %}
+    <p class="awaiting">판정 대기:
+      {% for e in d.work.awaiting %}<a href="/projects/{{ project.id }}/experiments/{{ e.short_id }}#decision"><span class="id">{{ e.short_id }}</span> {{ e.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
+    <p class="hint"><strong>작업 진행은 목표 달성을 뜻하지 않습니다.</strong></p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>성공 기준별 최신 근거</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">기준</th><th scope="col">목표</th><th scope="col">현재 기준선{% if baseline %} {{ baseline.short_id }}{% endif %}</th><th scope="col">최근 시도</th><th scope="col">상태</th></tr>
+      </thead>
+      <tbody>
+        {% for row in d.rows %}{% set e = row.evaluation %}
+        <tr>
+          <td><span class="id">{{ e.criterion.short_id }}</span> {{ e.criterion.name }}<br><code class="muted">{{ e.criterion.metric_key }}</code></td>
+          <td>{{ e.criterion.direction|direction_symbol }} {{ e.criterion.target|target }}{% if e.criterion.unit %} {{ e.criterion.unit }}{% endif %}
+            <br><span class="muted">{{ AGGREGATE_LABELS[e.criterion.aggregate] }}{% if e.criterion.min_runs > 1 %}, 실행 {{ e.criterion.min_runs }}개 이상{% endif %}</span></td>
+          <td>{{ e.display_value }}</td>
+          <td>{% if row.attempt %}{% set x = row.attempt.experiment %}
+            <a href="/projects/{{ project.id }}/experiments/{{ x.short_id }}">{{ x.short_id }}</a> {{ row.attempt_display }}
+            <br><span class="muted">{% if x.outcome %}{{ outcome_symbols[x.outcome][0] }} {{ outcome_symbols[x.outcome][1] }}{% else %}판정 전{% endif %}</span>
+            {% else %}<span class="muted">—</span>{% endif %}</td>
+          <td><span class="badge state-{{ e.state.value }}">{{ e.state_label }}</span>
+            {% if e.state.value == 'insufficient' %}<br><span class="muted">실행 {{ e.aggregated.n }}/{{ e.criterion.min_runs }}</span>{% endif %}
+            {% if e.state.value == 'unmeasured' %}<br>
+              {% if d.on_baseline_zero %}<a class="button small" href="/projects/{{ project.id }}/experiments/E0#results">측정값 기록</a>
+              {% elif focus %}<a class="button small" href="/projects/{{ project.id }}/problems/{{ focus.short_id }}/experiments/new">측정 실험 만들기</a>
+              {% else %}<a class="button small" href="/projects/{{ project.id }}/problems">측정 실험 만들기</a>{% endif %}
+            {% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">현재 기준선 값은 기준선의 근거 실행으로만 계산합니다. 최근 시도는 그 지표를 마지막으로 기록한 실험이고, 채택하기 전에는 목표 달성에 반영되지 않습니다.{% if not d.on_baseline_zero %} 현재 기준선에서 재지 않은 기준은 측정 실험을 채택해야 채워집니다.{% endif %}</p>
 </section>
 
 <section class="card">
@@ -23,35 +88,32 @@
   {% if parked_count %}<p class="muted">보류 서랍에 나중에 검토할 아이디어 {{ parked_count }}개가 있습니다.</p>{% endif %}
 </section>
 
-<section class="card">
-  <div class="section-head">
-    <h2>성공 기준별 최신 근거</h2>
-    <p class="goal-summary">
-      목표 달성: 성공 기준 {{ evaluations|length }}개 중
-      {% for state in states %}<span class="badge state-{{ state.value }}">{{ state_labels[state] }} {{ summary[state] }}</span>{% endfor %}
-    </p>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th scope="col">기준</th><th scope="col">목표</th><th scope="col">현재 기준선{% if baseline %} {{ baseline.short_id }}{% endif %}</th><th scope="col">상태</th></tr>
-      </thead>
-      <tbody>
-        {% for e in evaluations %}
-        <tr>
-          <td><span class="id">{{ e.criterion.short_id }}</span> {{ e.criterion.name }}<br><code class="muted">{{ e.criterion.metric_key }}</code></td>
-          <td>{{ e.criterion.direction|direction_symbol }} {{ e.criterion.target|target }}{% if e.criterion.unit %} {{ e.criterion.unit }}{% endif %}
-            <br><span class="muted">{{ AGGREGATE_LABELS[e.criterion.aggregate] }}{% if e.criterion.min_runs > 1 %}, 실행 {{ e.criterion.min_runs }}개 이상{% endif %}</span></td>
-          <td>{{ e.display_value }}</td>
-          <td><span class="badge state-{{ e.state.value }}">{{ e.state_label }}</span>
-            {% if e.state.value == 'insufficient' %}<br><span class="muted">실행 {{ e.aggregated.n }}/{{ e.criterion.min_runs }}</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="hint">목표 달성은 현재 기준선의 측정값으로만 판정합니다. 완료한 실험 수와는 별개입니다.</p>
-</section>
+<div class="two-col">
+  <section class="card">
+    <h2>마지막 결정</h2>
+    {% set ld = d.last_decision %}
+    {% if ld %}
+    <p><span class="id">{{ ld.decision.short_id }}</span> <strong>{{ ld.label }}</strong> ·
+      <a href="/projects/{{ project.id }}/experiments/{{ ld.experiment.short_id }}#decision"><span class="id">{{ ld.experiment.short_id }}</span> {{ ld.experiment.title }}</a></p>
+    <p>{{ ld.decision.reason }}</p>
+    <p class="muted">{{ ld.decision.created_at.strftime('%Y-%m-%d %H:%M') }} UTC{% if ld.moved_to %} · 기준선 {{ ld.moved_from.short_id if ld.moved_from else '' }} → {{ ld.moved_to.short_id }}{% endif %}</p>
+    {% else %}
+    <p class="muted">아직 판정한 실험이 없습니다.</p>
+    {% endif %}
+  </section>
+  <section class="card" id="next-action">
+    <h2>다음 행동</h2>
+    <form method="post" action="/projects/{{ project.id }}/next-action" class="stack">
+      <label class="visually-hidden" for="next_action">다음 행동</label>
+      <input id="next_action" name="next_action" maxlength="{{ max_next_action }}"
+        value="{{ values.next_action if 'next_action' in values else (project.next_action or '') }}"
+        placeholder="예: E2 설정으로 100문항 평균 응답 시간을 측정한다"
+        {% if errors.get('next_action') %}aria-invalid="true" aria-describedby="next_action-error"{% endif %}>
+      {% if errors.get('next_action') %}<p class="field-error" id="next_action-error">{{ errors['next_action'] }}</p>{% endif %}
+      <button type="submit" class="button">저장</button>
+    </form>
+  </section>
+</div>
 
 <div class="two-col">
   <section class="card">
@@ -62,8 +124,13 @@
     {% endif %}
   </section>
   <section class="card">
-    <h2>다음 행동</h2>
-    <p>{{ project.next_action or '아직 정하지 않았습니다.' }}</p>
+    <h2>기준선 이력</h2>
+    <ol class="baseline-history">
+      {% for row in d.history %}
+      <li><span class="muted">{{ row.change.created_at.strftime('%Y-%m-%d') }} UTC</span> {{ row.label }} → <span class="id">{{ row.to.short_id }}</span> {{ row.to.label }}{% if row.decision %} <span class="muted">({{ row.decision.short_id }})</span>{% endif %}</li>
+      {% endfor %}
+    </ol>
+    {% if d.history_total > d.history|length %}<p class="hint">최근 {{ d.history|length }}건만 보여줍니다(전체 {{ d.history_total }}건).</p>{% endif %}
   </section>
 </div>
 {% endblock %}

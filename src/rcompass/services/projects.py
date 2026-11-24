@@ -33,6 +33,20 @@ from rcompass.services import ValidationError
 METRIC_KEY_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,99}$")
 # 한 번의 입력으로 만들 수 있는 실행 수 상한(최소 실행 수도 같은 상한).
 MAX_RUNS = 100
+# 다음 행동은 홈에서 바로 고치는 한 줄입니다.
+MAX_NEXT_ACTION = 300
+
+
+def one_line(text: str | None) -> str | None:
+    """줄바꿈과 연속 공백을 공백 하나로 합칩니다. 비면 None."""
+    return " ".join((text or "").split()) or None
+
+
+def next_action_error(text: str | None) -> str | None:
+    line = one_line(text)
+    if line and len(line) > MAX_NEXT_ACTION:
+        return f"다음 행동은 한 줄로 {MAX_NEXT_ACTION}자 이내로 적어 주세요."
+    return None
 
 
 @dataclass
@@ -89,6 +103,8 @@ def validate_project_input(data: ProjectInput) -> dict[str, str]:
             errors[f"{prefix}-baseline_values"] = "기준선 값은 숫자여야 합니다."
         elif len(criterion.baseline_values) > MAX_RUNS:
             errors[f"{prefix}-baseline_values"] = f"기준선 값은 실행 {MAX_RUNS}개까지 입력할 수 있습니다."
+    if message := next_action_error(data.next_action):
+        errors["next_action"] = message
     return errors
 
 
@@ -106,7 +122,7 @@ def create_project(session: Session, data: ProjectInput) -> Project:
     project = Project(
         title=data.title.strip(),
         question=data.question.strip(),
-        next_action=(data.next_action or "").strip() or None,
+        next_action=one_line(data.next_action),
     )
     session.add(project)
     session.flush()

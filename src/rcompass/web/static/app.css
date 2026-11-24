@@ -342,3 +342,16 @@ ol.history li.history-reject { border-left-color: var(--not-met); }
 ol.history li.history-hold { border-left-color: var(--insufficient); }
 ol.history li.history-revoke { border-left-color: var(--warn); }
 ol.history p { margin: 0.1rem 0; }
+
+/* 프로젝트 홈 */
+.page-head .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.big-number { font-size: 2rem; font-weight: 700; margin: 0; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.big-number .of { font-size: 1.1rem; font-weight: 600; color: var(--muted); }
+.progress-pair .card p { margin: 0.25rem 0; }
+.awaiting { font-size: 0.9rem; }
+ol.baseline-history { list-style: none; padding: 0; margin: 0; }
+ol.baseline-history li { padding: 0.15rem 0; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

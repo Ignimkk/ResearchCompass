@@ -93,7 +93,8 @@
 
   <section class="card stack">
     <label>다음 행동 (선택)
-      <input name="next_action" value="{{ values.next_action }}" placeholder="예: 오답 18개를 유형별로 분류한다">
+      <input name="next_action" maxlength="300" value="{{ values.next_action }}" placeholder="예: 오답 18개를 유형별로 분류한다" {% if errors.get('next_action') %}aria-invalid="true" aria-describedby="next_action-error"{% endif %}>
+      {% if errors.get('next_action') %}<p class="field-error" id="next_action-error">{{ errors['next_action'] }}</p>{% endif %}
     </label>
   </section>
 

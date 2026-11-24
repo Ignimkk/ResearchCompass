@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -16,7 +16,8 @@ from rcompass.models import Aggregate, Direction, Experiment, Problem
 from rcompass.services import ValidationError
 from rcompass.services.problems import STATUS_LABELS as PROBLEM_STATUS_LABELS
 from rcompass.services.problems import inactive_ancestors, parked_problems, problem_path
-from rcompass.services.progress import STATE_LABELS, CriterionState, evaluate_project, goal_summary
+from rcompass.services.dashboard import MAX_NEXT_ACTION, build_dashboard, update_next_action
+from rcompass.services.progress import STATE_LABELS, CriterionState
 from rcompass.services.projects import (
     CriterionInput,
     ProjectInput,
@@ -198,15 +199,17 @@ async def create_project_route(request: Request) -> Response:
     return RedirectResponse(f"/projects/{project_id}", status_code=303)
 
 
-@router.get("/projects/{project_id}", response_class=HTMLResponse)
-def project_home(request: Request, project_id: int, session: SessionDep) -> HTMLResponse:
+def _home_project_or_404(session: Session, project_id: int):
     project = get_project(session, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
-    evaluations = evaluate_project(session, project)
+    return project
+
+
+def _render_project_home(request: Request, session: Session, project, *, errors: dict | None = None,
+                         values: dict | None = None, status_code: int = 200) -> HTMLResponse:
     context = project_context(session, project, section="home")
     baseline = context["baseline"]
-    baseline_experiment = session.get(Experiment, baseline.source_experiment_id) if baseline else None
     focus = session.get(Problem, project.focus_problem_id) if project.focus_problem_id else None
     focus_path = problem_path(session, focus) if focus else []
     return templates.TemplateResponse(
@@ -214,15 +217,38 @@ def project_home(request: Request, project_id: int, session: SessionDep) -> HTML
         "project_home.html",
         {
             **context,
-            "evaluations": evaluations,
-            "summary": goal_summary(evaluations),
+            "dashboard": build_dashboard(session, project),
             "states": list(CriterionState),
             "state_labels": STATE_LABELS,
-            "baseline_experiment": baseline_experiment,
+            "baseline_experiment": session.get(Experiment, baseline.source_experiment_id) if baseline else None,
             "focus": focus,
             "focus_path": focus_path,
             "focus_blockers": inactive_ancestors(focus_path),
             "problem_status_labels": PROBLEM_STATUS_LABELS,
             "parked_count": len(parked_problems(session, project.id)),
+            "max_next_action": MAX_NEXT_ACTION,
+            "errors": errors or {},
+            "values": values or {},
+            "saved": request.query_params.get("saved"),
         },
+        status_code=status_code,
     )
+
+
+@router.get("/projects/{project_id}", response_class=HTMLResponse)
+def project_home(request: Request, project_id: int, session: SessionDep) -> HTMLResponse:
+    return _render_project_home(request, session, _home_project_or_404(session, project_id))
+
+
+@router.post("/projects/{project_id}/next-action")
+def next_action_route(request: Request, project_id: int, session: SessionDep,
+                      next_action: Annotated[str, Form()] = "") -> Response:
+    project = _home_project_or_404(session, project_id)
+    try:
+        update_next_action(session, project, next_action)
+    except ValidationError as error:
+        session.rollback()
+        return _render_project_home(request, session, project, errors=error.errors,
+                                    values={"next_action": next_action}, status_code=422)
+    session.commit()
+    return RedirectResponse(f"/projects/{project.id}?saved=next_action#next-action", status_code=303)

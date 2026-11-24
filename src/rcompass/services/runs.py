@@ -18,7 +18,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from rcompass.ids import next_short_id
@@ -204,13 +204,11 @@ def record_results(
             run.status = RunStatus.DONE
         for key, value in row.values.items():
             wrote_value = True
-            result = session.scalars(
-                select(MetricResult).where(MetricResult.run_id == run.id, MetricResult.metric_key == key)
-            ).first()
+            # 다시 기록하면 예전 행을 지우고 새로 만듭니다. 그래야 id와 created_at이 '마지막으로 기록한 때'를 가리킵니다.
+            session.execute(delete(MetricResult).where(MetricResult.run_id == run.id, MetricResult.metric_key == key))
             criterion = criteria.get(key)
-            if result is None:
-                result = MetricResult(run_id=run.id, metric_key=key)
-                session.add(result)
+            result = MetricResult(run_id=run.id, metric_key=key)
+            session.add(result)
             result.value = value
             result.unit = criterion.unit if criterion else None
             result.criterion_id = criterion.id if criterion else None
